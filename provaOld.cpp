@@ -105,270 +105,255 @@ double minArea = minEdge * minEdge;
 double maxEdge = focL * objSIZE / 30;
 double maxArea = maxEdge * maxEdge;
 
-Mat frame; // frame originale catturato dalla telecamera
+
+string funz(Mat frame);
+
 int main() {
 
-	// to measure the execution time
-	double duration;
+	double duration=0;
 	double nciclo = 1;
+	Mat frame;
+
+	namedWindow("prova", WINDOW_AUTOSIZE);
+
+
+	for(int count = 28;count < 78 ;count++){
+
+		nciclo=0;
+
+		remove(("./FileOutput/Dur" + to_string(count) + ".txt").c_str());
+
+		ofstream Duration_txt(("./FileOutput/Dur" + to_string(count) + ".txt").c_str(), ios::app);
+
+		while (nciclo < 100) {
+
+			frame = imread("./Test_img/IMG_12" + to_string(count) + ".JPG");
+
+			duration = static_cast<double>(cv::getTickCount());
+
+			string found = funz(frame.clone());
+
+			duration = (static_cast<double>(cv::getTickCount()) - duration)
+			/ getTickFrequency();
+
+			Duration_txt << found << endl <<  duration << ";" << endl;
+
+
+			waitKey(1);
+			nciclo++;
+
+		}
+
+		Duration_txt.close();
+
+	}
+
+	cvDestroyAllWindows();
+	// the camera will be deinitialized automatically in VideoCapture destructor
+	return 0;
+}
+
+string funz(Mat frame){
 
 	int numRoi = 0;
 	int numTri = 0;
 	int numCir = 0;
 
-	//cout << "rate = " << rate << endl;
-
-	vector<vector<Point> > squares;
+	vector<vector<Point>> squares;
 	vector<ROI_Rect*> vectROI_Rect;
 	vector<GeomSignal*> geomSignals;
 
-	if(!ROI_txt || !Signal_txt || !Triangle_txt || !Circle_txt || !Duration_txt){
-		cout << "Errore nella scrittura del file" << endl;
-		return -1;
-	}
 	int N_ROI = 0;
 	int N_Signal = 0;
+	Mat frameGray; // frame in bianco e nero
+	Mat normal;
+	string ret = "null";
 
-	for(int count = 1;count <25;count++){
-		cout << count;
+	cvtColor(frame, frameGray, CV_BGR2GRAY);
+	normal = frame.clone();
+	Mat fG = frameGray.clone();
+	findSquares(fG, squares);
+	const vector<Point>* curr_square;
+	Rect ROI;
+	for (size_t i = 0; i < squares.size(); i++) {
+		curr_square = &squares[i];
 
-		remove("./FileOutput/Dur" + to_string(count) + ".txt");
+		ROI = cv::boundingRect(cv::Mat(*curr_square));
+		Point centerROI(ROI.x + ROI.width / 2, ROI.y + ROI.height / 2);
 
-		ofstream Duration_txt("./FileOutput/Dur" + to_string(count) + ".txt", ios::app);
+		// aggiungo una nuova ROI solo se il centro di essa (che sara' oggetto di indagine)
+		// non e' gia' contenuto in un'altra ROI
+		if (vectROI_Rect.size() == 0) {
+			//la aggiungo
+			vectROI_Rect.push_back(new ROI_Rect(ROI, *curr_square));
+		} else {
+			// sel il flag  true ROI verrˆ aggiunta in memoria sempre che flag1=true
+			bool flag = false;
+			bool flag1 = true;
+			// scorro tutto il vettore di ROI_Rect in modo inverso
+			vector<ROI_Rect*>::reverse_iterator rit_ROI_Rect;
+			int ii = vectROI_Rect.size() - 1;
+			for (rit_ROI_Rect = vectROI_Rect.rbegin();
+					rit_ROI_Rect != vectROI_Rect.rend(); ++rit_ROI_Rect) {
+				Point centerROI_rit_ROI_Rect(
+						(*rit_ROI_Rect)->getROI().x
+								+ (*rit_ROI_Rect)->getROI().width / 2,
+						(*rit_ROI_Rect)->getROI().y
+								+ (*rit_ROI_Rect)->getROI().height / 2);
 
-		while (nciclo <= 10) {
-
-			Mat frameGray; // frame in bianco e nero
-			Mat normal;
-
-			frame = imread("./img/IMG_" + to_string(count) + ".jpg");
-			//frame = imread("./Img_ForTest/finalResult.jpg");
-
-			cvtColor(frame, frameGray, CV_BGR2GRAY);
-			normal = frame.clone();
-
-			/*
-			 * adattamento dalla libreria opencv
-			 */
-			Mat fG = frameGray.clone();
-			findSquares(fG, squares);
-
-			/*
-			 * definisco le ROI
-			 */
-			const vector<Point>* curr_square;
-			Rect ROI;
-			for (size_t i = 0; i < squares.size(); i++) {
-				curr_square = &squares[i];
-
-				ROI = cv::boundingRect(cv::Mat(*curr_square));
-				Point centerROI(ROI.x + ROI.width / 2, ROI.y + ROI.height / 2);
-
-				// aggiungo una nuova ROI solo se il centro di essa (che sara' oggetto di indagine)
-				// non e' gia' contenuto in un'altra ROI
-				if (vectROI_Rect.size() == 0) {
-					//la aggiungo
-					vectROI_Rect.push_back(new ROI_Rect(ROI, *curr_square));
-				} else {
-					// sel il flag  true ROI verrˆ aggiunta in memoria sempre che flag1=true
-					bool flag = false;
-					bool flag1 = true;
-					// scorro tutto il vettore di ROI_Rect in modo inverso
-					vector<ROI_Rect*>::reverse_iterator rit_ROI_Rect;
-					int ii = vectROI_Rect.size() - 1;
-					for (rit_ROI_Rect = vectROI_Rect.rbegin();
-							rit_ROI_Rect != vectROI_Rect.rend(); ++rit_ROI_Rect) {
-						Point centerROI_rit_ROI_Rect(
-								(*rit_ROI_Rect)->getROI().x
-										+ (*rit_ROI_Rect)->getROI().width / 2,
-								(*rit_ROI_Rect)->getROI().y
-										+ (*rit_ROI_Rect)->getROI().height / 2);
-
-						// se ROI ha semiperimetro minore di quella in memoria
-						if((ROI.width + ROI.height) < ((*rit_ROI_Rect)->getROI().width
-								+ (*rit_ROI_Rect)->getROI().height)){
-							if(ROI.contains(centerROI_rit_ROI_Rect)){
-								delete vectROI_Rect[ii];
-								vectROI_Rect[ii] = vectROI_Rect[vectROI_Rect.size()
-										- 1];
-								vectROI_Rect.pop_back();
-								if (!flag)
-									flag = true;
-							}else{
-								if (!flag)
-									flag = true;
-							}
-						}else{
-							// la ROI_in memoria  pi piccola
-
-							if((*rit_ROI_Rect)->getROI().contains(centerROI)){
-								// questa ROI_in memoria contiene il centro della ROI
-								// ROI non andra aggiunta in NESSUN caso - setto a false il flag1
-								flag1 = false;
-							}else{
-								 // la ROI_in memoria non contiene il centro di ROI
-								if (!flag)
-									flag = true;
-							}
-						}
-
-						// decremento l'indice posizionale dell'array
-						ii--;
+				// se ROI ha semiperimetro minore di quella in memoria
+				if((ROI.width + ROI.height) < ((*rit_ROI_Rect)->getROI().width
+						+ (*rit_ROI_Rect)->getROI().height)){
+					if(ROI.contains(centerROI_rit_ROI_Rect)){
+						delete vectROI_Rect[ii];
+						vectROI_Rect[ii] = vectROI_Rect[vectROI_Rect.size()
+								- 1];
+						vectROI_Rect.pop_back();
+						if (!flag)
+							flag = true;
+					}else{
+						if (!flag)
+							flag = true;
 					}
-					if (flag) {
-						if(flag1){
-							// aggiungo la ROI
-							vectROI_Rect.push_back(new ROI_Rect(ROI, *curr_square));
-						}
+				}else{
+					// la ROI_in memoria  pi piccola
+
+					if((*rit_ROI_Rect)->getROI().contains(centerROI)){
+						// questa ROI_in memoria contiene il centro della ROI
+						// ROI non andra aggiunta in NESSUN caso - setto a false il flag1
+						flag1 = false;
+					}else{
+						 // la ROI_in memoria non contiene il centro di ROI
+						if (!flag)
+							flag = true;
 					}
 				}
-
-			}
-
-			//cout << "N ROI_Rect: " << vectROI_Rect.size() << endl;
-			N_ROI = vectROI_Rect.size();
-			int color;
-			vector<ROI_Rect*>::iterator it;
-			for (it = vectROI_Rect.begin(); it != vectROI_Rect.end(); ++it) {
-				color = rand() % 256;
-				Point centerROI_((*it)->getROI().x + (*it)->getROI().width / 2,
-						(*it)->getROI().y + (*it)->getROI().height / 2);
-
-				vector<Point> vp = (*it)->getRect();
-				const Point* p = &vp[0];
-				int n = (int) (*it)->getRect().size();
-				polylines(normal, &p, &n, 1, true, Scalar(color, color, color), 2,
-				CV_AA);
-
-				cv::rectangle(normal, (*it)->getROI(),
-						cv::Scalar(255, 255, 0), 2);
-				circle(normal, centerROI_, 2, cv::Scalar(255, 255, 0), 2); // draw dot in the center of ROI
-			}
-			/*
-			 * fine ROI
-			 */
-
-			/*
-			 *
-			 */
-			vector<ROI_Rect*>::iterator it1;
-			vector<Point> vp;
-			for (it1 = vectROI_Rect.begin(); it1 != vectROI_Rect.end(); ++it1) {
-
-				vp = (*it1)->getRect();
-				int l1 = (int)getDistance(vp[0], vp[1]);
-				int l2 = (int)getDistance(vp[1], vp[2]);
-				int l3 = (int)getDistance(vp[2], vp[3]);
-				int l4 = (int)getDistance(vp[3], vp[0]);
-
-				int maxEdgeLength = MAX(MAX(l1,l2), MAX(l3,l4));
-
-				Mat perspective(maxEdgeLength, maxEdgeLength, CV_8U, Scalar(0));
-
-				vector<Point2f> pointSquareMovedImage(4);
-				pointSquareMovedImage[0] = vp[0];
-				pointSquareMovedImage[1] = vp[1];
-				pointSquareMovedImage[2] = vp[2];
-				pointSquareMovedImage[3] = vp[3];
-
-				vector<Point2f> pointSquareFrontImage(4);
-				pointSquareFrontImage[0] = Point2f(0, 0);
-				pointSquareFrontImage[1] = Point2f(maxEdgeLength, 0);
-				pointSquareFrontImage[2] = Point2f(maxEdgeLength, maxEdgeLength);
-				pointSquareFrontImage[3] = Point2f(0, maxEdgeLength);
-
-				Mat matrixPerspectiveTransform;
-				matrixPerspectiveTransform = getPerspectiveTransform(
-						pointSquareMovedImage, pointSquareFrontImage);
-
-				warpPerspective(frameGray, perspective, matrixPerspectiveTransform,
-						perspective.size(), INTER_LINEAR, BORDER_CONSTANT, 0);
-
-				/*namedWindow("perspective", WINDOW_NORMAL);
-				imshow("perspective", perspective);*/
-
-				Rect ROI = (*it1)->getROI();
-				findGeometricSignal(perspective, ROI, geomSignals);
-			}
-			//cout << "N segnali trovati: " << geomSignals.size() << endl;
-			N_Signal = geomSignals.size();
-			unsigned int nTriangle = 0;
-			unsigned int nCircle = 0;
-
-			vector<GeomSignal*>::reverse_iterator rit;
-			int i = geomSignals.size() - 1;
-			for (rit = geomSignals.rbegin(); rit != geomSignals.rend(); ++rit) {
-				if ((*rit)->getName() == "Triangle") {
-					nTriangle++;
-				} else if ((*rit)->getName() == "Circle") {
-					nCircle++;
-				}
-
-				putText(normal, (*rit)->getName(),
-						Point((*rit)->getRectROI().x,
-								(*rit)->getRectROI().y
-										+ (*rit)->getRectROI().height),
-						cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 0, 0), 2,
-						true);
-
-				delete *rit;
-				geomSignals[i] = geomSignals[geomSignals.size() - 1];
-				geomSignals.pop_back();
 
 				// decremento l'indice posizionale dell'array
-				i--;
+				ii--;
 			}
-
-			/*cout << "(" << nTriangle << ")" << "Triangle\t"
-					<< "(" << nCircle << ")" << "Circle\t" << endl;*/
-
-		//		// show the window that displays the results of the program
-			imshow("normal", normal);
-
-			// to measure the execution time
-			duration = (static_cast<double>(cv::getTickCount()) - duration)
-					/ getTickFrequency();	// the elapsed time in s
-			/*cout << endl << "N ciclo: " << nciclo << "\t duration: " << duration
-					<< "s" << endl;
-			cout << "*******************************************" << endl << endl;*/
-			nciclo++;
-
-			numRoi += N_ROI;
-			numCir += nCircle;
-			numTri += nTriangle;
-
-			Duration_txt << duration << ";" << endl;
-
-			Duration_txt.close();
-
-			// clear data arrays
-			squares.clear();
-			if (vectROI_Rect.size() > 0) {
-				vector<ROI_Rect*>::iterator it;
-				for (it = vectROI_Rect.begin(); it != vectROI_Rect.end(); ++it) {
-					delete *it;
+			if (flag) {
+				if(flag1){
+					// aggiungo la ROI
+					vectROI_Rect.push_back(new ROI_Rect(ROI, *curr_square));
 				}
-				vectROI_Rect.clear();
 			}
-			if (geomSignals.size() > 0) {
-				geomSignals.clear();
-			}
-
-
-			if (waitKey(30) >= 0)
-				break;
 		}
+
 	}
 
+	//cout << "N ROI_Rect: " << vectROI_Rect.size() << endl;
+	N_ROI = vectROI_Rect.size();
+	int color;
+	vector<ROI_Rect*>::iterator it;
+	for (it = vectROI_Rect.begin(); it != vectROI_Rect.end(); ++it) {
+		color = rand() % 256;
+		Point centerROI_((*it)->getROI().x + (*it)->getROI().width / 2,
+				(*it)->getROI().y + (*it)->getROI().height / 2);
 
-	// chiudi gli output stream
+		vector<Point> vp = (*it)->getRect();
+		const Point* p = &vp[0];
+		int n = (int) (*it)->getRect().size();
+		polylines(normal, &p, &n, 1, true, Scalar(color, color, color), 2,
+		CV_AA);
 
-	cout << " ROI : " << numRoi << " - Tri : " << numTri << " - Cir : " << numCir << endl;
+		cv::rectangle(normal, (*it)->getROI(),
+				cv::Scalar(255, 255, 0), 2);
+		circle(normal, centerROI_, 2, cv::Scalar(255, 255, 0), 2); // draw dot in the center of ROI
+	}
+
+	vector<ROI_Rect*>::iterator it1;
+	vector<Point> vp;
+	for (it1 = vectROI_Rect.begin(); it1 != vectROI_Rect.end(); ++it1) {
+
+		vp = (*it1)->getRect();
+		int l1 = (int)getDistance(vp[0], vp[1]);
+		int l2 = (int)getDistance(vp[1], vp[2]);
+		int l3 = (int)getDistance(vp[2], vp[3]);
+		int l4 = (int)getDistance(vp[3], vp[0]);
+
+		int maxEdgeLength = MAX(MAX(l1,l2), MAX(l3,l4));
+
+		Mat perspective(maxEdgeLength, maxEdgeLength, CV_8U, Scalar(0));
+
+		vector<Point2f> pointSquareMovedImage(4);
+		pointSquareMovedImage[0] = vp[0];
+		pointSquareMovedImage[1] = vp[1];
+		pointSquareMovedImage[2] = vp[2];
+		pointSquareMovedImage[3] = vp[3];
+
+		vector<Point2f> pointSquareFrontImage(4);
+		pointSquareFrontImage[0] = Point2f(0, 0);
+		pointSquareFrontImage[1] = Point2f(maxEdgeLength, 0);
+		pointSquareFrontImage[2] = Point2f(maxEdgeLength, maxEdgeLength);
+		pointSquareFrontImage[3] = Point2f(0, maxEdgeLength);
+
+		Mat matrixPerspectiveTransform;
+		matrixPerspectiveTransform = getPerspectiveTransform(
+				pointSquareMovedImage, pointSquareFrontImage);
+
+		warpPerspective(frameGray, perspective, matrixPerspectiveTransform,
+				perspective.size(), INTER_LINEAR, BORDER_CONSTANT, 0);
+
+		/*namedWindow("perspective", WINDOW_NORMAL);
+		imshow("perspective", perspective);*/
+
+		Rect ROI = (*it1)->getROI();
+		findGeometricSignal(perspective, ROI, geomSignals);
+	}
+	//cout << "N segnali trovati: " << geomSignals.size() << endl;
+	N_Signal = geomSignals.size();
+	unsigned int nTriangle = 0;
+	unsigned int nCircle = 0;
+
+	vector<GeomSignal*>::reverse_iterator rit;
+	int i = geomSignals.size() - 1;
+	for (rit = geomSignals.rbegin(); rit != geomSignals.rend(); ++rit) {
+		if ((*rit)->getName() == "Triangle") {
+			nTriangle++;
+		} else if ((*rit)->getName() == "Circle") {
+			nCircle++;
+		}
+
+		ret = (*rit)->getName();
+		
+		putText(normal, (*rit)->getName(),
+				Point((*rit)->getRectROI().x,
+						(*rit)->getRectROI().y
+								+ (*rit)->getRectROI().height),
+				cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 0, 0), 2,
+				true);
 
 
-	cvDestroyAllWindows();
-	// the camera will be deinitialized automatically in VideoCapture destructor
-	return 0;
+
+		delete *rit;
+		geomSignals[i] = geomSignals[geomSignals.size() - 1];
+		geomSignals.pop_back();
+
+		// decremento l'indice posizionale dell'array
+		i--;
+	}
+
+	imshow("prova", normal);
+
+
+	numRoi += N_ROI;
+	numCir += nCircle;
+	numTri += nTriangle;
+
+	// clear data arrays
+	squares.clear();
+	if (vectROI_Rect.size() > 0) {
+		vector<ROI_Rect*>::iterator it;
+		for (it = vectROI_Rect.begin(); it != vectROI_Rect.end(); ++it) {
+			delete *it;
+		}
+		vectROI_Rect.clear();
+	}
+	if (geomSignals.size() > 0) {
+		geomSignals.clear();
+	}
+	return ret;
 }
 
 // helper function:
@@ -567,6 +552,25 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 
 	// find circles
 	Mat img_find_circles = img.clone();
+
+	//Miglioramento
+
+	//cvtColor(img_find_circles,img_find_circles,CV_BGR2GRAY);
+	/*int n=0,m=0;
+	for(int k = 0; k < img_find_circles.rows ; k++ ){
+		for(int y = 0; y < img_find_circles.rows ; y++ ){
+			Vec3b data = img_find_circles.at<Vec3b>(k,y);
+			m += (int) (data[0] + data[1] + data[2])/3;
+			n++;
+		}
+	}
+
+	m = m/n;
+
+	cv::threshold( img_find_circles, img_find_circles, m, 255 ,0 );*/
+
+	// /Miglioramento
+
 	GaussianBlur(img_find_circles, img_find_circles, cv::Size(3, 3), 1.5);
 //	namedWindow("img_find_circles", WINDOW_NORMAL);
 //	imshow("img_find_circles", img_find_circles);
