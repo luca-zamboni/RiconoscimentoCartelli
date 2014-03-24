@@ -125,24 +125,28 @@ int main() {
 
 		ofstream Duration_txt(("./FileOutput/Dur" + to_string(count) + ".txt").c_str(), ios::app);
 
-		while (nciclo < 100) {
+		string found = "null";
+
+		while (nciclo < 2) {
 
 			frame = imread("./Test_img/IMG_12" + to_string(count) + ".JPG");
 
 			duration = static_cast<double>(cv::getTickCount());
 
-			string found = funz(frame.clone());
+			found = funz(frame.clone());
 
 			duration = (static_cast<double>(cv::getTickCount()) - duration)
 			/ getTickFrequency();
 
-			Duration_txt << found << endl <<  duration << ";" << endl;
+			Duration_txt  <<  duration << ";" << endl;
 
 
 			waitKey(1);
 			nciclo++;
 
 		}
+
+		Duration_txt  << found << endl;
 
 		Duration_txt.close();
 
@@ -541,7 +545,7 @@ double getDistance(const Point& a, const Point& b) {
 
 void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals) {
 
-//	Mat result = img.clone();
+	Mat result = img.clone();
 
 	// il rapporto tra la larghezza dell'immagine, la quale rappresenta
 	// la larghezza della ROI e i lati dei triangoli riscontrati
@@ -571,20 +575,23 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 
 	// /Miglioramento
 
-	GaussianBlur(img_find_circles, img_find_circles, cv::Size(3, 3), 1.5);
-//	namedWindow("img_find_circles", WINDOW_NORMAL);
-//	imshow("img_find_circles", img_find_circles);
+	GaussianBlur(img_find_circles, img_find_circles, cv::Size(3, 3), 0.5);
+
+	//namedWindow("result", WINDOW_NORMAL);
+	//imshow("img_find_circles", img_find_circles);
+
 	vector<Vec3f> circles;
 	HoughCircles(img_find_circles, circles, CV_HOUGH_GRADIENT, 2, // accumulator resolution (size of the image / 2)
 			50, // min distance between two circles
-			200, // Canny high threshold
-			90, // minimum number of votes
-			30, 100); // min and max radius
+			80, // Canny high threshold
+			40, // minimum number of votes
+			0, 1000); // min and max radius
+
 	if (circles.size() > 0) {
 		vector<Vec3f>::reverse_iterator rit_c;
 		int i = circles.size() - 1;
 		for (rit_c = circles.rbegin(); rit_c != circles.rend(); ++rit_c) {
-			if (lato_img / (*rit_c)[2] <= 2*PROPORZ_CARTELLO_SEGNALE) {
+			if (lato_img / (*rit_c)[2] <= PROPORZ_CARTELLO_SEGNALE) {
 				circles[i] = circles[circles.size() - 1];
 				circles.pop_back();
 			}
@@ -693,9 +700,10 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 	int raggioIntorno = img.size().width / (2.1 * 2 * 1.732050808);
 	Point center_img(img.size().width / 2, img.size().height / 2);
 ////disegno l'intorno
-//	circle(result, center_img, raggioIntorno,					// circle radius
-//			Scalar(130, 130, 130),					// color
-//			1);
+	/*circle(result, center_img, raggioIntorno,					// circle radius
+			Scalar(130, 130, 130),					// color
+			1);*/
+
 	double distance_from_center_img;
 
 	if (circles.size() > 0) {
@@ -779,5 +787,5 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 		// none to add
 	}
 
-//	imshow("result", result);
+	//imshow("result", result);
 }
