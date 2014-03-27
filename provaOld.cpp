@@ -71,7 +71,7 @@ const char* wndname = "Square Detection Demo";
 double angle(Point pt1, Point pt2, Point pt0);
 void findSquares(const Mat& image, vector<vector<Point> >& squares);
 void drawSquares(Mat& image, const vector<vector<Point> >& squares);
-const double ERROR_LEN = 1 / 3.;
+const double ERROR_LEN = 1 / 2.5;
 const double DISCARD_CORNERS_PIXEL = 30;
 void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& signals);
 
@@ -129,7 +129,7 @@ int main() {
 
 		while (nciclo < 2) {
 
-			frame = imread("./Test_img/IMG_12" + to_string(count) + ".JPG");
+			frame = imread("./Test_img/IMG_12" + to_string(29) + ".JPG");
 
 			duration = static_cast<double>(cv::getTickCount());
 
@@ -610,21 +610,21 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 
 	// hack: use Canny instead of zero threshold level.
 	// Canny helps to catch squares with gradient shading
-	Canny(timg, gray, 200, 500, 5);
+	Canny(timg, gray, 200, 500, 3);
 	// dilate canny output to remove potential
 	// holes between edge segments
-	dilate(gray, gray, Mat(), Point(-1, -1));
+	//dilate(gray, gray, Mat(), Point(-1, -1));
 
-//	namedWindow("img_find_t&s", WINDOW_NORMAL);
-//	imshow("img_find_t&s", gray);
+	namedWindow("tri", WINDOW_NORMAL);
 
 	// find contours and store them all as a list
 	findContours(gray, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
 
-	//	drawContours(img, contours, -1, // draw all contours
-	//			cv::Scalar(0, 0, 255), // in yellow
-	//			1); // with a thickness of 2
-	//	imshow("img+contours", img);
+		/*drawContours(img, contours, -1, // draw all contours
+				cv::Scalar(0, 0, 255), // in yellow
+				1); // with a thickness of 2*/
+
+	imshow("tri", img);
 	vector<Point> approx;
 
 	// test each contour
@@ -632,9 +632,12 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 		// approximate contour with accuracy proportional
 		// to the contour perimeter
 		approxPolyDP(Mat(contours[i]), approx,
-				arcLength(Mat(contours[i]), true) * 0.02, true);
+				arcLength(Mat(contours[i]), true) * 0.05, true);
+
 
 		if (approx.size() == 3) {
+
+			cout << "a";
 
 			double maxCosine = 0;
 
@@ -671,7 +674,7 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 				double edgeLength[3] = { 0.0, 0.0, 0.0 };
 				edgeLength[0] = getDistance(approx[0], approx[1]);
 				edgeLength[1] = getDistance(approx[1], approx[2]);
-				edgeLength[2] = getDistance(approx[2], approx[1]);
+				edgeLength[2] = getDistance(approx[2], approx[0]);
 
 				if (lato_img / edgeLength[0] > PROPORZ_CARTELLO_SEGNALE
 						&& lato_img / edgeLength[1] > PROPORZ_CARTELLO_SEGNALE
