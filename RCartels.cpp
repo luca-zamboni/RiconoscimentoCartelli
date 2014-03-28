@@ -1,6 +1,7 @@
 //============================================================================
 // Name        : RiconoscimentoCartelli.cpp
 // Author      : Giovanni
+// Optimization: Luca
 // Version     :
 // Copyright   :
 // Description :
@@ -13,6 +14,11 @@
 #include <fstream>
 
 #include <string.h> 
+
+#include <dirent.h> 
+#include <stdio.h> 
+
+#include <sys/stat.h>
 
 using namespace cv;
 using namespace std;
@@ -75,26 +81,9 @@ const double ERROR_LEN = 1 / 2.5;
 const double DISCARD_CORNERS_PIXEL = 30;
 void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& signals);
 
-// Per come sono cotruiti i cartelli, il rapporto tra il lato
-// del quadrato pi esterno e il segrale pi interno,
-// (vale il lato per il quadrato e triangolo, il diametro per il cerchio)
-// non deve essere inferiore a 1,6 -> 8cm/5cm
-// il limite viene impostato a 1,3 per via di errori & arrotondamenti
 const float PROPORZ_CARTELLO_SEGNALE = 1.3;
 
 const float PROPORZ_LARGHEZZA_ROI = 2.5;
-
-// Min & Max Area of the square.
-// Il cartello deve essere posto ad una distanza minima di 30 cm
-// dalla telecamera e una massima di 300 (30 metri).
-// Otteniamo la stima sui pixel dalla seguente proporzione
-//
-//    objsize = (focL * objSIZE) / objDIST
-//
-//	objsize		-> object size (pixel)
-//	focL		-> focal length
-//	objSIZE		-> object size (cm)
-//	objDIST		-> Distance object from camera (cm)
 
 float focL = 1394.589220272376;
 float objSIZE = 8;
@@ -105,52 +94,98 @@ double minArea = minEdge * minEdge;
 double maxEdge = focL * objSIZE / 30;
 double maxArea = maxEdge * maxEdge;
 
+string DIR_IMG = "./Test_img/";
 
 string funz(Mat frame);
+bool is_dir(const char* path) ;
 
 int main() {
 
-	double duration=0;
-	double nciclo = 1;
+	double duration=0,nciclo = 1;
 	Mat frame;
+	float media = 0,mtri=0,mcirc=0,msqua=0;
+	int NCICLI = 2,tri=0,squa=0,circ=0,count=0;
+	string NOT_FOUND = "null";
 
-	namedWindow("prova", WINDOW_AUTOSIZE);
+	//namedWindow("prova", WINDOW_AUTOSIZE);
 
+	remove("./FileOutput/GlobalStat.txt");
+	ofstream statFile("./FileOutput/GlobalStat.txt", ios::app);
 
-	for(int count = 28;count < 78 ;count++){
+	string filename = "";
+	DIR *d;
+	struct dirent *dir;
+	d = opendir(DIR_IMG.c_str());
+	while ((dir = readdir(d)) != NULL){
 
-		nciclo=0;
+		if(is_dir((DIR_IMG + dir->d_name).c_str())){
+			continue;
+		}
 
-		remove(("./FileOutput/Dur" + to_string(count) + ".txt").c_str());
+		count++;
 
-		ofstream Duration_txt(("./FileOutput/Dur" + to_string(count) + ".txt").c_str(), ios::app);
+		string aux(dir->d_name);
+		string outFilename = "./FileOutput/"+aux.substr(0,aux.size()-3)+"txt";
 
-		string found = "null";
+		media = 0;
+		string found = NOT_FOUND;
+		string auxFound = NOT_FOUND;
 
-		while (nciclo < 2) {
+		remove(outFilename.c_str());
+		ofstream oneStatFile(outFilename.c_str(), ios::app);
 
-			frame = imread("./Test_img/IMG_12" + to_string(29) + ".JPG");
+		// N cicli di test
+		for(int nciclo=0;nciclo < NCICLI;nciclo++) {
 
+			frame = imread(DIR_IMG + aux);
 			duration = static_cast<double>(cv::getTickCount());
 
 			found = funz(frame.clone());
 
-			duration = (static_cast<double>(cv::getTickCount()) - duration)
-			/ getTickFrequency();
+			duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
 
-			Duration_txt  <<  duration << ";" << endl;
-
-
+			if(found != NOT_FOUND){
+				auxFound = found;
+			}
+			oneStatFile << found << " \t\t- " << duration << ";" << endl;
+			media += duration;
 			waitKey(1);
-			nciclo++;
 
 		}
 
-		Duration_txt  << found << endl;
+		if(auxFound != NOT_FOUND){
+			if(auxFound == "Triang"){
+				tri++;
+				mtri += duration;
+			}
+			if(auxFound == "Circle"){
+				circ++;
+				mcirc += duration;
+			}
+			if(auxFound == "Square"){
+				squa++;
+				msqua += duration;
+			}
+		}
 
-		Duration_txt.close();
+		media = media / NCICLI;
+		oneStatFile << "Media : " << media << endl;
+		oneStatFile.close();
 
 	}
+	closedir(d);
+
+	if(tri!=0) mtri = mtri / tri;
+	if(squa!=0) msqua = msqua / squa;
+	if(circ!=0) mcirc = mcirc / circ;
+
+	statFile << "N-Input : \t" << count << "\t Riconosciuti : " << (tri+circ+squa) << endl;
+	statFile << "Triangl : \t" << tri << "\t t-medio : \t" << mtri << endl;
+	statFile << "Circles : \t" << circ << "\t t-medio : \t" << mcirc << endl;
+	statFile << "Squares : \t" << squa << "\t t-medio : \t" << msqua << endl;
+	statFile << "N Cicli : \t" << NCICLI;
+
+	statFile.close();
 
 	cvDestroyAllWindows();
 	// the camera will be deinitialized automatically in VideoCapture destructor
@@ -338,7 +373,7 @@ string funz(Mat frame){
 		i--;
 	}
 
-	imshow("prova", normal);
+	//imshow("prova", normal);
 
 
 	numRoi += N_ROI;
@@ -360,9 +395,7 @@ string funz(Mat frame){
 	return ret;
 }
 
-// helper function:
-// finds a cosine of angle between vectors
-// from pt0->pt1 and from pt0->pt2
+
 double angle(Point pt1, Point pt2, Point pt0) {
 	double dx1 = pt1.x - pt0.x;
 	double dy1 = pt1.y - pt0.y;
@@ -372,14 +405,11 @@ double angle(Point pt1, Point pt2, Point pt0) {
 			/ sqrt((dx1 * dx1 + dy1 * dy1) * (dx2 * dx2 + dy2 * dy2) + 1e-10);
 }
 
-// returns sequence of squares detected on the image.
-// the sequence is stored in a specified memory storage
 void findSquares(const Mat& image, vector<vector<Point> >& squares) {
 	squares.clear();
 
 	Mat pyr, timg, gray0(image.size(), CV_8U), gray;
 
-	// down-scale and upscale the image to filter out the noise
 	pyrDown(image, pyr, Size(image.cols / 2, image.rows / 2));
 	pyrUp(pyr, timg, image.size());
 	vector<vector<Point> > contours;
@@ -394,18 +424,10 @@ void findSquares(const Mat& image, vector<vector<Point> >& squares) {
 
 	vector<Point> approx;
 
-	// test each contour
 	for (size_t i = 0; i < contours.size(); i++) {
-		// approximate contour with accuracy proportional
-		// to the contour perimeter
 		approxPolyDP(Mat(contours[i]), approx,
 				arcLength(Mat(contours[i]), true) * 0.02, true);
 
-		// square contours should have 4 vertices after approximation
-		// relatively large area (to filter out noisy contours)
-		// and be convex.
-		// Note: contourArea have a second parameter by default = false,
-		// the absolute value of the calculated area is returned.
 		if (approx.size() == 4 && contourArea(Mat(approx)) > minArea
 				&& /*aggiunto->*/contourArea(Mat(approx)) < maxArea
 				&& isContourConvex(Mat(approx))) {
@@ -418,19 +440,8 @@ void findSquares(const Mat& image, vector<vector<Point> >& squares) {
 				maxCosine = MAX(maxCosine, cosine);
 			}
 
-			// if cosines of all angles are small
-			// (all angles are ~90 degree) then write quandrange
-			// vertices to resultant sequence
 			if (maxCosine < 0.5) {
 
-				// order point
-				//          lato 1
-				//     p1 .--------. p2
-				//        |        |
-				// lato 4 |        | lato 2
-				//        |        |
-				//     p4 .--------. p3
-				//          lato 3
 				std::stable_sort(approx.begin(), approx.end(), yComparator);
 				if (approx[0].x > approx[1].x) {
 					Point tmp = approx[0];
@@ -546,46 +557,13 @@ double getDistance(const Point& a, const Point& b) {
 void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals) {
 
 	Mat result = img.clone();
-
-	// il rapporto tra la larghezza dell'immagine, la quale rappresenta
-	// la larghezza della ROI e i lati dei triangoli riscontrati
-	// devono essere superiore a PROPORZ_CARTELLO_SEGNALE
-	// per il cerchio deve valere che img.rows / raggio > 2*PROPORZ_CARTELLO_SEGNALE
-//	int lato_img = img.rows;
 	int lato_img = img.size().width;
-
-	// find circles
 	Mat img_find_circles = img.clone();
-
-	//Miglioramento
-
-	//cvtColor(img_find_circles,img_find_circles,CV_BGR2GRAY);
-	/*int n=0,m=0;
-	for(int k = 0; k < img_find_circles.rows ; k++ ){
-		for(int y = 0; y < img_find_circles.rows ; y++ ){
-			Vec3b data = img_find_circles.at<Vec3b>(k,y);
-			m += (int) (data[0] + data[1] + data[2])/3;
-			n++;
-		}
-	}
-
-	m = m/n;
-
-	cv::threshold( img_find_circles, img_find_circles, m, 255 ,0 );*/
-
-	// /Miglioramento
 
 	GaussianBlur(img_find_circles, img_find_circles, cv::Size(3, 3), 0.5);
 
-	//namedWindow("result", WINDOW_NORMAL);
-	//imshow("img_find_circles", img_find_circles);
-
 	vector<Vec3f> circles;
-	HoughCircles(img_find_circles, circles, CV_HOUGH_GRADIENT, 2, // accumulator resolution (size of the image / 2)
-			50, // min distance between two circles
-			80, // Canny high threshold
-			40, // minimum number of votes
-			0, 1000); // min and max radius
+	HoughCircles(img_find_circles, circles, CV_HOUGH_GRADIENT, 2, 50, 80, 40, 0, 1000); 
 
 	if (circles.size() > 0) {
 		vector<Vec3f>::reverse_iterator rit_c;
@@ -607,24 +585,14 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 	vector<vector<Point> > contours;
 
 	vector<vector<Point> > triangles;
-
-	// hack: use Canny instead of zero threshold level.
-	// Canny helps to catch squares with gradient shading
-	Canny(timg, gray, 200, 500, 3);
-	// dilate canny output to remove potential
-	// holes between edge segments
-	//dilate(gray, gray, Mat(), Point(-1, -1));
-
-	namedWindow("tri", WINDOW_NORMAL);
+	Canny(timg, gray, 155, 255, 3);
+	//namedWindow("tri", WINDOW_NORMAL);
 
 	// find contours and store them all as a list
 	findContours(gray, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
 
-		/*drawContours(img, contours, -1, // draw all contours
-				cv::Scalar(0, 0, 255), // in yellow
-				1); // with a thickness of 2*/
 
-	imshow("tri", img);
+	//imshow("tri", timg);
 	vector<Point> approx;
 
 	// test each contour
@@ -634,10 +602,7 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 		approxPolyDP(Mat(contours[i]), approx,
 				arcLength(Mat(contours[i]), true) * 0.05, true);
 
-
 		if (approx.size() == 3) {
-
-			cout << "a";
 
 			double maxCosine = 0;
 
@@ -648,19 +613,7 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 				maxCosine = MAX(maxCosine, cosine);
 			}
 
-			// if cosines of all angles are small
-			// (all angles are ~60 degree) then write equilateral triangle
-			// vertices to resultant sequence
 			if (maxCosine > 0.3 && maxCosine < 0.7) {
-				/* order point
-				 *        p1 .
-				 *          / \
-				 * lato 3  /   \  lato 1
-				 *        /     \
-				 *       /       \
-				 *   p3 . ------- . p2
-				 *         lato 2
-				 */
 				std::stable_sort(approx.begin(), approx.end(), yComparator);
 				if (approx[1].x > approx[2].x) {
 					Point tmp = approx[1];
@@ -668,9 +621,6 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 					approx[2] = tmp;
 				}
 
-				// controllo che i lati del triangolo siano pressapoco lunghi uguali
-				// in particolare controllo che la differenza tra i tre lati
-				// presi a 2 a 2 sia inferiore di 1/3 * il piu lungo
 				double edgeLength[3] = { 0.0, 0.0, 0.0 };
 				edgeLength[0] = getDistance(approx[0], approx[1]);
 				edgeLength[1] = getDistance(approx[1], approx[2]);
@@ -698,14 +648,8 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 
 	}
 
-// tra tutte le figure trovate mantengo solamente quelle che hanno il
-// proprio centro entro l'intorno calcolato al centro di img.
 	int raggioIntorno = img.size().width / (2.1 * 2 * 1.732050808);
 	Point center_img(img.size().width / 2, img.size().height / 2);
-////disegno l'intorno
-	/*circle(result, center_img, raggioIntorno,					// circle radius
-			Scalar(130, 130, 130),					// color
-			1);*/
 
 	double distance_from_center_img;
 
@@ -734,15 +678,10 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 				triangles[i] = triangles[triangles.size() - 1];
 				triangles.pop_back();
 			}
-//			circle(result, centerT, 2,
-//					cv::Scalar(161, 0, 244));	// draw pink dot
 			i--;
 		}
 	}
 
-// considero che la figura di area minore
-// indichi il segnale corretto
-// name ->  N=none, C=circle, T=triangle
 	char name = 'N';
 	double minArea = -1;
 	double area;
@@ -750,14 +689,6 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 	if (circles.size() > 0) {
 		vector<Vec3f>::const_iterator it_c = circles.begin();
 		while (it_c != circles.end()) {
-//			circle(result, Point((*it_c)[0], (*it_c)[1]), // circle centre
-//			(*it_c)[2], // circle radius
-//					Scalar(0, 255, 0), // color
-//					1); // thickness
-//			circle(result, Point((*it_c)[0], (*it_c)[1]), // circle centre
-//			2, // circle radius
-//					Scalar(0, 255, 0), // color
-//					2);
 
 			area = ((*it_c)[2]) * 3.1415926535;
 			if (area < minArea || minArea == -1) {
@@ -785,10 +716,16 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 	if (name == 'C') {
 		geomeSignals.push_back(new GeomSignal("Circle", img, ROI));
 	} else if (name == 'T') {
-		geomeSignals.push_back(new GeomSignal("Triangle", img, ROI));
+		geomeSignals.push_back(new GeomSignal("Triang", img, ROI));
 	} else if (name == 'N') {
 		// none to add
 	}
 
 	//imshow("result", result);
+}
+
+bool is_dir(const char* path) {
+    struct stat buf;
+    lstat(path, &buf);
+    return S_ISDIR(buf.st_mode);
 }
