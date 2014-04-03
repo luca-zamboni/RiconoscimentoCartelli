@@ -106,7 +106,7 @@ int main(int argc, char* argv[]) {
 	Mat frame;
 	float media = 0,mtri=0,mcirc=0,msqua=0;
 	int NCICLI = 20,tri=0,squa=0,circ=0,count=0;
-	string NOT_FOUND = "null"
+	string NOT_FOUND = "null";
 
 	if(argc!=3){
 		FORMA = "C";
@@ -145,7 +145,7 @@ int main(int argc, char* argv[]) {
 		count++;
 
 		string aux(dir->d_name);
-		string outFilename = "./FileOutput/"+aux.substr(0,aux.size()-3)+"txt";
+		string outFilename = "./FileOutput/"+FORMA+"/"+aux.substr(0,aux.size()-3)+"txt";
 
 		media = 0;
 		string found = NOT_FOUND;
@@ -614,7 +614,7 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 
 	vector<vector<Point> > triangles;
 
-	/******/
+	/***  Mia modifica che migliore i triangoli ***/
 
 	int n=0,m=0;
 	for(int k = 0; k < timg.rows ; k++ ){
