@@ -95,19 +95,39 @@ double maxEdge = focL * objSIZE / 30;
 double maxArea = maxEdge * maxEdge;
 
 string DIR_IMG = "./Test_img/";
+string FORMA = "";
 
 string funz(Mat frame);
 bool is_dir(const char* path) ;
 
-int main() {
+int main(int argc, char* argv[]) {
 
 	double duration=0,nciclo = 1;
 	Mat frame;
 	float media = 0,mtri=0,mcirc=0,msqua=0;
-	int NCICLI = 2,tri=0,squa=0,circ=0,count=0;
-	string NOT_FOUND = "null";
+	int NCICLI = 20,tri=0,squa=0,circ=0,count=0;
+	string NOT_FOUND = "null"
 
-	//namedWindow("prova", WINDOW_AUTOSIZE);
+	if(argc!=3){
+		FORMA = "C";
+		NCICLI = 2;
+	}
+	else{
+		FORMA = argv[1];
+		NCICLI = atoi(argv[2]);
+		if(FORMA != "C" && FORMA != "S" && FORMA != "T"){
+			cout << " usage : ./app [Form] [Time] " << endl;
+			return 0;
+		}
+		if(NCICLI < 2 || NCICLI > 100){
+			cout << "Out of range" << endl;
+			return 0;
+		}
+		
+	}
+
+	DIR_IMG += FORMA + "/";
+	//namedWindow("Immagini", WINDOW_AUTOSIZE);
 
 	remove("./FileOutput/GlobalStat.txt");
 	ofstream statFile("./FileOutput/GlobalStat.txt", ios::app);
@@ -138,6 +158,7 @@ int main() {
 		for(int nciclo=0;nciclo < NCICLI;nciclo++) {
 
 			frame = imread(DIR_IMG + aux);
+			//frame = imread(DIR_IMG + "IMG_1253.JPG");
 			duration = static_cast<double>(cv::getTickCount());
 
 			found = funz(frame.clone());
@@ -185,6 +206,12 @@ int main() {
 	statFile << "Squares : \t" << squa << "\t t-medio : \t" << msqua << endl;
 	statFile << "N Cicli : \t" << NCICLI;
 
+	cout << "N-Input : \t" << count << "\t Riconosciuti : " << (tri+circ+squa) << endl;
+	cout << "Triangl : \t" << tri << "\t t-medio : \t" << mtri << endl;
+	cout << "Circles : \t" << circ << "\t t-medio : \t" << mcirc << endl;
+	cout << "Squares : \t" << squa << "\t t-medio : \t" << msqua << endl;
+	cout << "N Cicli : \t" << NCICLI << endl;
+
 	statFile.close();
 
 	cvDestroyAllWindows();
@@ -198,7 +225,7 @@ string funz(Mat frame){
 	int numTri = 0;
 	int numCir = 0;
 
-	vector<vector<Point>> squares;
+	vector<vector<Point> > squares;
 	vector<ROI_Rect*> vectROI_Rect;
 	vector<GeomSignal*> geomSignals;
 
@@ -373,7 +400,7 @@ string funz(Mat frame){
 		i--;
 	}
 
-	//imshow("prova", normal);
+	//imshow("Immagini", normal);
 
 
 	numRoi += N_ROI;
@@ -413,6 +440,7 @@ void findSquares(const Mat& image, vector<vector<Point> >& squares) {
 	pyrDown(image, pyr, Size(image.cols / 2, image.rows / 2));
 	pyrUp(pyr, timg, image.size());
 	vector<vector<Point> > contours;
+
 
 	Canny(timg, gray, 155, 255, 5);
 	// dilate canny output to remove potential
@@ -585,6 +613,24 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 	vector<vector<Point> > contours;
 
 	vector<vector<Point> > triangles;
+
+	/******/
+
+	int n=0,m=0;
+	for(int k = 0; k < timg.rows ; k++ ){
+		for(int y = 0; y < timg.rows ; y++ ){
+			Vec3b data = timg.at<Vec3b>(k,y);
+			m += (int) (data[0] + data[1] + data[2])/3;
+			n++;
+		}
+	}
+
+	m = m/n;
+
+	cv::threshold( timg, timg, m, 255 ,0 );
+
+	/******/
+
 	Canny(timg, gray, 155, 255, 3);
 	//namedWindow("tri", WINDOW_NORMAL);
 
