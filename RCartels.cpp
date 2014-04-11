@@ -20,6 +20,8 @@
 
 #include <sys/stat.h>
 
+#include "vanishing/vanishing.h"
+
 using namespace cv;
 using namespace std;
 
@@ -99,10 +101,13 @@ string FORMA = "";
 
 string funz(Mat frame);
 bool is_dir(const char* path) ;
+ofstream durationStat;
+double duration=0,totDuration=0;
+int cartTrovati = 0;
 
 int main(int argc, char* argv[]) {
 
-	double duration=0,nciclo = 1;
+	double nciclo = 1;
 	Mat frame;
 	float media = 0,mtri=0,mcirc=0,msqua=0;
 	int NCICLI = 20,tri=0,squa=0,circ=0,count=0;
@@ -127,10 +132,14 @@ int main(int argc, char* argv[]) {
 	}
 
 	DIR_IMG += FORMA + "/";
-	//namedWindow("Immagini", WINDOW_AUTOSIZE);
+	namedWindow("Normal", WINDOW_NORMAL);
+	//namedWindow("Immaginisenzarumore", WINDOW_NORMAL);
 
 	remove("./FileOutput/GlobalStat.txt");
 	ofstream statFile("./FileOutput/GlobalStat.txt", ios::app);
+
+	remove("./FileOutput/DurationStat.txt");
+	durationStat.open("./FileOutput/DurationStat.txt", ios::app);
 
 	string filename = "";
 	DIR *d;
@@ -158,18 +167,23 @@ int main(int argc, char* argv[]) {
 		for(int nciclo=0;nciclo < NCICLI;nciclo++) {
 
 			frame = imread(DIR_IMG + aux);
-			//frame = imread(DIR_IMG + "IMG_1253.JPG");
+			//frame = imread(DIR_IMG + "IMG_1228.JPG");
 			duration = static_cast<double>(cv::getTickCount());
+			totDuration  = static_cast<double>(cv::getTickCount());
 
 			found = funz(frame.clone());
 
 			duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
+			totDuration = (static_cast<double>(cv::getTickCount()) - totDuration) / getTickFrequency();
+			cout << totDuration << " total Duration " << endl;
+			cout << cartTrovati << " Cartelli trovati " << endl << endl;
+			cartTrovati=0;
 
 			if(found != NOT_FOUND){
 				auxFound = found;
 			}
-			oneStatFile << found << " \t\t- " << duration << ";" << endl;
-			media += duration;
+			oneStatFile << found << " \t\t- " << totDuration << ";" << endl;
+			media += totDuration;
 			waitKey(1);
 
 		}
@@ -177,15 +191,15 @@ int main(int argc, char* argv[]) {
 		if(auxFound != NOT_FOUND){
 			if(auxFound == "Triang"){
 				tri++;
-				mtri += duration;
+				mtri += totDuration;
 			}
 			if(auxFound == "Circle"){
 				circ++;
-				mcirc += duration;
+				mcirc += totDuration;
 			}
 			if(auxFound == "Square"){
 				squa++;
-				msqua += duration;
+				msqua += totDuration;
 			}
 		}
 
@@ -213,6 +227,7 @@ int main(int argc, char* argv[]) {
 	cout << "N Cicli : \t" << NCICLI << endl;
 
 	statFile.close();
+	durationStat.close();
 
 	cvDestroyAllWindows();
 	// the camera will be deinitialized automatically in VideoCapture destructor
@@ -225,6 +240,9 @@ string funz(Mat frame){
 	int numTri = 0;
 	int numCir = 0;
 
+	double *out;
+	int n;
+
 	vector<vector<Point> > squares;
 	vector<ROI_Rect*> vectROI_Rect;
 	vector<GeomSignal*> geomSignals;
@@ -236,6 +254,18 @@ string funz(Mat frame){
 	string ret = "null";
 
 	cvtColor(frame, frameGray, CV_BGR2GRAY);
+
+	duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
+	cout << duration << " Before lsd" << endl;
+	duration = static_cast<double>(cv::getTickCount());
+
+	Point p = vanishingPoint(frameGray);
+	cout << p << endl;
+
+	duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
+	cout << duration << " Lsd time" << endl;
+	duration = static_cast<double>(cv::getTickCount());
+
 	normal = frame.clone();
 	Mat fG = frameGray.clone();
 	findSquares(fG, squares);
@@ -253,7 +283,7 @@ string funz(Mat frame){
 			//la aggiungo
 			vectROI_Rect.push_back(new ROI_Rect(ROI, *curr_square));
 		} else {
-			// sel il flag  true ROI verrˆ aggiunta in memoria sempre che flag1=true
+			// sel il flag Â true ROI verrË† aggiunta in memoria sempre che flag1=true
 			bool flag = false;
 			bool flag1 = true;
 			// scorro tutto il vettore di ROI_Rect in modo inverso
@@ -282,7 +312,7 @@ string funz(Mat frame){
 							flag = true;
 					}
 				}else{
-					// la ROI_in memoria  pi piccola
+					// la ROI_in memoria Â piÂ piccola
 
 					if((*rit_ROI_Rect)->getROI().contains(centerROI)){
 						// questa ROI_in memoria contiene il centro della ROI
@@ -367,6 +397,10 @@ string funz(Mat frame){
 		Rect ROI = (*it1)->getROI();
 		findGeometricSignal(perspective, ROI, geomSignals);
 	}
+
+	duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
+	cout << duration << " Lavorazione quadrati con forme geometrihe" << endl;
+	duration = static_cast<double>(cv::getTickCount());
 	//cout << "N segnali trovati: " << geomSignals.size() << endl;
 	N_Signal = geomSignals.size();
 	unsigned int nTriangle = 0;
@@ -437,15 +471,25 @@ void findSquares(const Mat& image, vector<vector<Point> >& squares) {
 
 	Mat pyr, timg, gray0(image.size(), CV_8U), gray;
 
+
+	//imshow("Immagini",image);
+	duration = static_cast<double>(cv::getTickCount());
 	pyrDown(image, pyr, Size(image.cols / 2, image.rows / 2));
 	pyrUp(pyr, timg, image.size());
 	vector<vector<Point> > contours;
 
+	duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
+	cout << duration << " time di resize" << endl;
+	duration = static_cast<double>(cv::getTickCount());
 
 	Canny(timg, gray, 155, 255, 5);
-	// dilate canny output to remove potential
-	// holes between edge segments
 	dilate(gray, gray, Mat(), Point(-1, -1));
+
+	duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
+	cout << duration << " time di canny" << endl;
+	duration = static_cast<double>(cv::getTickCount());
+
+	//imshow("Immaginisenzarumore",gray);
 
 	// find contours and store them all as a list
 	findContours(gray, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
@@ -583,6 +627,10 @@ double getDistance(const Point& a, const Point& b) {
 }
 
 void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals) {
+
+	cartTrovati ++;
+
+	//duration = static_cast<double>(cv::getTickCount());
 
 	Mat result = img.clone();
 	int lato_img = img.size().width;
@@ -766,6 +814,10 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 	} else if (name == 'N') {
 		// none to add
 	}
+
+	/*duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
+	cout << duration << " time di ricerca forme geometriche" << endl;
+	duration = static_cast<double>(cv::getTickCount());*/
 
 	//imshow("result", result);
 }
