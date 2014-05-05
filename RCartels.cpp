@@ -120,7 +120,7 @@ int main(int argc, char* argv[]) {
 	else{
 		FORMA = argv[1];
 		NCICLI = atoi(argv[2]);
-		if(FORMA != "C" && FORMA != "S" && FORMA != "T"){
+		if(FORMA != "C" && FORMA != "S" && FORMA != "T" && FORMA != "V"){
 			cout << " usage : ./app [Form] [Time] " << endl;
 			return 0;
 		}
@@ -167,7 +167,7 @@ int main(int argc, char* argv[]) {
 		for(int nciclo=0;nciclo < NCICLI;nciclo++) {
 
 			frame = imread(DIR_IMG + aux);
-			//frame = imread(DIR_IMG + "IMG_1228.JPG");
+			//frame = imread(DIR_IMG + "strada.jpg");
 			duration = static_cast<double>(cv::getTickCount());
 			totDuration  = static_cast<double>(cv::getTickCount());
 
@@ -184,7 +184,7 @@ int main(int argc, char* argv[]) {
 			}
 			oneStatFile << found << " \t\t- " << totDuration << ";" << endl;
 			media += totDuration;
-			waitKey(1);
+			waitKey(1000);
 
 		}
 
@@ -259,7 +259,7 @@ string funz(Mat frame){
 	cout << duration << " Before lsd" << endl;
 	duration = static_cast<double>(cv::getTickCount());
 
-	Point p = vanishingPoint(frameGray);
+	Point p = vanishingPoint(frameGray,Point(0,0));
 	cout << p << endl;
 
 	duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
@@ -283,7 +283,7 @@ string funz(Mat frame){
 			//la aggiungo
 			vectROI_Rect.push_back(new ROI_Rect(ROI, *curr_square));
 		} else {
-			// sel il flag  true ROI verrˆ aggiunta in memoria sempre che flag1=true
+			// sel il flag è true ROI verrà aggiunta in memoria sempre che flag1=true
 			bool flag = false;
 			bool flag1 = true;
 			// scorro tutto il vettore di ROI_Rect in modo inverso
