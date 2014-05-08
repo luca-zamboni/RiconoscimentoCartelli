@@ -162,7 +162,7 @@ int main(int argc, char* argv[]) {
 		remove(outFilename.c_str());
 		ofstream oneStatFile(outFilename.c_str(), ios::app);
 
-		// N cicli di test
+		// N cicli di test 
 		for(int nciclo=0;nciclo < NCICLI;nciclo++) {
 
 			frame = imread(DIR_IMG + aux);
