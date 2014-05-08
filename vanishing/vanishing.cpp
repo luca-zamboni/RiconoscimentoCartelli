@@ -1,51 +1,37 @@
 
 #include "vanishing.h"
 
-using namespace std;
+VanPoint::WPoint::WPoint(Point p,double w){
+	this->p = p;
+	this->w = w;
+}
 
-class Segment{
-	private:
-		void calc(){
-			xmp = (x1+x2) / 2;
-			ymp = (y1+y2) / 2;
-			slopeDeg = atan((y2-y1)/(x2-x1)) * 180 / M_PI;
-			slNorm = (y2-y1)/(x2-x1);
-		}
-	public:
-		double x1,x2,y1,y2,p,w,logNfa,xmp,ymp,slopeDeg,slNorm;
-		Segment(double* points){
-			x1 = 3*points[1];
-			y1 = points[0];
-			x2 = 3*points[3];
-			y2 = points[2];
-			w =  sqrt(pow( x2 - x1 ,2) + pow( y2 - y1 ,2));
-			p = points[5];
-			logNfa = points[6];
-			calc();
-		}
-};
+void VanPoint::Segment::calc(){
+	xmp = (x1+x2) / 2;
+	ymp = (y1+y2) / 2;
+	slopeDeg = atan((y2-y1)/(x2-x1)) * 180 / M_PI;
+	slNorm = (y2-y1)/(x2-x1);
+}
 
-class WPoint{
-	public:
-		Point p;
-		double w;
-		WPoint(Point p,double w){
-			this->p = p;
-			this->w = w;
-		}
-};
+VanPoint::Segment::Segment(double* points){
+	x1 = 3*points[1];
+	y1 = points[0];
+	x2 = 3*points[3];
+	y2 = points[2];
+	w =  sqrt(pow( x2 - x1 ,2) + pow( y2 - y1 ,2));
+	p = points[5];
+	logNfa = points[6];
+	calc();
+}
 
-const float RATE_M_LENGHT = 0.03;
-float minLength;
-int minAlpha = 10;
-int maxAlpha = 70;
+VanPoint::VanPoint(){
+	van = Point(0,0);
+}
 
-bool ctrlSegment(Segment s,double xmax,double ymax);
-WPoint getWIntesection(Segment sx, Segment dx);
-
-Point vanishingPoint(Mat frame,Point van){
+Point VanPoint::vanishingPoint(Mat frame){
 
 	minLength = frame.cols * RATE_M_LENGHT;
+	Mat mframe = frame.clone();
 
 	int n;
 	double *aux = (double *) malloc(frame.rows * frame.cols * sizeof(double));
@@ -62,7 +48,7 @@ Point vanishingPoint(Mat frame,Point van){
 	double xm = frame.rows / 2;
 	for(int i=0;i<n;i++){
 		Segment s(out+(7*i));
-		if(ctrlSegment(s,frame.cols,frame.rows)){
+		if(ctrlSegment(s,frame.cols+4,frame.rows)){
 			if(s.slNorm < 0){
 				segsx.push_back(s);
 			}else{
@@ -70,13 +56,29 @@ Point vanishingPoint(Mat frame,Point van){
 			}
 		}
 	}
-	
-	vector <WPoint> wpnts;
+
+	vector<Segment> AB;
 	for(Segment sdx : segdx){
+		AB.push_back(sdx);
+	}
+	for(Segment ssx : segsx){
+		AB.push_back(ssx);
+	}
+
+	vector <WPoint> wpnts;
+	for(Segment ab : AB){
+		for(Segment ba : AB){
+			if(ba.x1!=ab.x1){
+				wpnts.push_back(getWIntesection(ab,ba));
+			}
+		}
+	}
+
+	/*for(Segment sdx : segdx){
 		for(Segment ssx : segsx){
 			wpnts.push_back(getWIntesection(ssx,sdx));
 		}
-	}
+	}*/
 
 	double sommaw = 0;
 	for(int i=0;i<wpnts.size();i++){
@@ -89,29 +91,30 @@ Point vanishingPoint(Mat frame,Point van){
 		vani.y += wpnts[i].p.y * wpnts[i].w / sommaw;
     }
 
+    if(van.x!=0 && van.y!=0 ){
+	    vani.x = (vani.x+van.x)/2;
+	    vani.y = (vani.y+van.y)/2;
+	}
+
     for(Segment sdx : segdx){
-		line( frame,Point(sdx.x1,sdx.y1),Point(sdx.x2,sdx.y2),Scalar( 0, 0, 0 ),11,8 );
+		line(mframe,Point(sdx.x1,sdx.y1),Point(sdx.x2,sdx.y2),Scalar( 0, 0, 0 ),11,8);
 	}
 	for(Segment ssx : segsx){
-		line( frame,Point(ssx.x1,ssx.y1),Point(ssx.x2,ssx.y2),Scalar( 0, 0, 0 ),11,8 );
+		line(mframe,Point(ssx.x1,ssx.y1),Point(ssx.x2,ssx.y2),Scalar( 0, 0, 0 ),11,8);
 	}
 	
-    circle( frame,
-         vani,
-         frame.rows/32.0,
-         Scalar( 0, 255, 255 ),
-         -1,
-         8 );
+    circle(mframe,vani,mframe.rows/32.0, Scalar(0,255,255),-1,8);
 
-	imshow("Normal",frame);
+	imshow("Normal",mframe);
 
 	free(aux);
 	free(out);
 
+	van = vani;
 	return vani;
 }
 
-WPoint getWIntesection(Segment sx, Segment dx){
+VanPoint::WPoint VanPoint::getWIntesection(Segment sx, Segment dx){
 
 	double qsx = sx.slNorm * sx.x1 - sx.y1;
 	double qdx = dx.slNorm * dx.x1 - dx.y1;
@@ -121,14 +124,18 @@ WPoint getWIntesection(Segment sx, Segment dx){
 	double y = ((-sx.slNorm)*qdx - (-dx.slNorm)*qsx)/sotto;
 
 	double w = pow(sx.w * dx.w,2);
+	
+	if((sx.slNorm<0 && dx.slNorm>0) || (sx.slNorm>0 && dx.slNorm<0)){
+		w = w*2;
+	}
 
 	return WPoint(Point(-x,-y),w);
 
 }
 
-bool ctrlSegment(Segment s,double xmax,double ymax){
+bool VanPoint::ctrlSegment(VanPoint::Segment s,double xmax,double ymax){
 
-	if(s.x1 > xmax || s.x2 > xmax)
+	if(s.x1 > xmax ||s.x2 > xmax)
 		return false;
 	
 	if(s.w < minLength)
@@ -139,4 +146,8 @@ bool ctrlSegment(Segment s,double xmax,double ymax){
 
 	return true;
 
+}
+
+void VanPoint::clean(){
+	van = Point(0,0);
 }

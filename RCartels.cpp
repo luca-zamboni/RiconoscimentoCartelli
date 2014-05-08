@@ -91,7 +91,7 @@ float focL = 1394.589220272376;
 float objSIZE = 8;
 
 double minEdge = focL * objSIZE / 300;
-double minArea = minEdge * minEdge;
+double minArea = minEdge;
 
 double maxEdge = focL * objSIZE / 30;
 double maxArea = maxEdge * maxEdge;
@@ -124,15 +124,14 @@ int main(int argc, char* argv[]) {
 			cout << " usage : ./app [Form] [Time] " << endl;
 			return 0;
 		}
-		if(NCICLI < 2 || NCICLI > 100){
+		if(NCICLI < 1 || NCICLI > 100){
 			cout << "Out of range" << endl;
 			return 0;
 		}
-		
 	}
 
 	DIR_IMG += FORMA + "/";
-	namedWindow("Normal", WINDOW_NORMAL);
+	//namedWindow("Normal", WINDOW_NORMAL);
 	//namedWindow("Immaginisenzarumore", WINDOW_NORMAL);
 
 	remove("./FileOutput/GlobalStat.txt");
@@ -256,26 +255,31 @@ string funz(Mat frame){
 	cvtColor(frame, frameGray, CV_BGR2GRAY);
 
 	duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
-	cout << duration << " Before lsd" << endl;
+	cout << duration << " Before vani" << endl;
 	duration = static_cast<double>(cv::getTickCount());
 
-	Point p = vanishingPoint(frameGray,Point(0,0));
+	VanPoint prova;
+	Point p = prova.vanishingPoint(frameGray);
 	cout << p << endl;
 
 	duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
-	cout << duration << " Lsd time" << endl;
+	cout << duration << " Vani time" << endl;
 	duration = static_cast<double>(cv::getTickCount());
 
 	normal = frame.clone();
 	Mat fG = frameGray.clone();
 	findSquares(fG, squares);
+
 	const vector<Point>* curr_square;
 	Rect ROI;
 	for (size_t i = 0; i < squares.size(); i++) {
+
 		curr_square = &squares[i];
 
 		ROI = cv::boundingRect(cv::Mat(*curr_square));
 		Point centerROI(ROI.x + ROI.width / 2, ROI.y + ROI.height / 2);
+
+		//rectangle( normal, ROI.tl(), ROI.br(), Scalar(255,255,255), -1, 8);
 
 		// aggiungo una nuova ROI solo se il centro di essa (che sara' oggetto di indagine)
 		// non e' gia' contenuto in un'altra ROI
@@ -435,7 +439,7 @@ string funz(Mat frame){
 	}
 
 	//imshow("Immagini", normal);
-
+	
 
 	numRoi += N_ROI;
 	numCir += nCircle;
@@ -470,7 +474,7 @@ void findSquares(const Mat& image, vector<vector<Point> >& squares) {
 	squares.clear();
 
 	Mat pyr, timg, gray0(image.size(), CV_8U), gray;
-
+	Mat cl = image.clone();
 
 	//imshow("Immagini",image);
 	duration = static_cast<double>(cv::getTickCount());
@@ -482,28 +486,39 @@ void findSquares(const Mat& image, vector<vector<Point> >& squares) {
 	cout << duration << " time di resize" << endl;
 	duration = static_cast<double>(cv::getTickCount());
 
-	Canny(timg, gray, 155, 255, 5);
+	Canny(timg, gray, 250,300 , 5);
 	dilate(gray, gray, Mat(), Point(-1, -1));
-
 	duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
 	cout << duration << " time di canny" << endl;
 	duration = static_cast<double>(cv::getTickCount());
 
-	//imshow("Immaginisenzarumore",gray);
+	
 
 	// find contours and store them all as a list
-	findContours(gray, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
+	//findContours(gray, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
+	vector<Vec4i> hierarchy;
+	findContours( gray, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
+
+	//imshow("Immaginisenzarumore",gray);
 
 	vector<Point> approx;
 
 	for (size_t i = 0; i < contours.size(); i++) {
+		drawContours( timg, contours, i, Scalar(0,0,255), 2, 8, hierarchy, 0, Point() );
 		approxPolyDP(Mat(contours[i]), approx,
 				arcLength(Mat(contours[i]), true) * 0.02, true);
 
 		if (approx.size() == 4 && contourArea(Mat(approx)) > minArea
-				&& /*aggiunto->*/contourArea(Mat(approx)) < maxArea
-				&& isContourConvex(Mat(approx))) {
+				&& contourArea(Mat(approx)) < maxArea
+				/*&& isContourConvex(Mat(approx))*/) {
 			double maxCosine = 0;
+
+			Rect ROI;
+			ROI = cv::boundingRect(cv::Mat(approx));
+			Point centerROI(ROI.x + ROI.width / 2, ROI.y + ROI.height / 2);
+
+			//rectangle( cl, ROI.tl(), ROI.br(), Scalar(255,255,255), 2, 8);
+
 
 			for (int j = 2; j < 5; j++) {
 				// find the maximum cosine of the angle between joint edges
@@ -564,6 +579,7 @@ void findSquares(const Mat& image, vector<vector<Point> >& squares) {
 			}
 		}
 	}
+	//imshow("Immaginisenzarumore",timg);
 }
 
 // the function draws all the squares in the image
@@ -578,7 +594,7 @@ void drawSquares(Mat& image, const vector<vector<Point> >& squares) {
 	int n = (int) squares[squares.size() - 1].size();
 	polylines(image, &p, &n, 1, true, Scalar(255, 0, 0), 3, CV_AA);
 	//***********
-	//imshow(wndname, image);
+	//imshow("ciao", image);
 }
 bool yComparator(const Point& a, const Point& b) {
 	return a.y < b.y;
@@ -630,6 +646,10 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 
 	cartTrovati ++;
 
+	/*namedWindow("tri", WINDOW_NORMAL);
+	imshow("tri",img);*/
+	
+
 	//duration = static_cast<double>(cv::getTickCount());
 
 	Mat result = img.clone();
@@ -660,6 +680,7 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 	pyrUp(pyr, timg, img.size());
 	vector<vector<Point> > contours;
 
+
 	vector<vector<Point> > triangles;
 
 	/***  Mia modifica che migliore i triangoli ***/
@@ -680,7 +701,6 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 	/******/
 
 	Canny(timg, gray, 155, 255, 3);
-	//namedWindow("tri", WINDOW_NORMAL);
 
 	// find contours and store them all as a list
 	findContours(gray, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
