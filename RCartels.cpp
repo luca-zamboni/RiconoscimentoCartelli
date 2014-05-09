@@ -21,6 +21,7 @@
 #include <sys/stat.h>
 
 #include "vanishing/vanishing.h"
+#include "pattern_utils/patternutils.hpp"
 
 using namespace cv;
 using namespace std;
@@ -96,6 +97,8 @@ double minArea = minEdge;
 double maxEdge = focL * objSIZE / 30;
 double maxArea = maxEdge * maxEdge;
 
+double MAXERRORRATE = 0.1;
+
 string DIR_IMG = "./Test_img/";
 string FORMA = "";
 
@@ -162,7 +165,7 @@ int main(int argc, char* argv[]) {
 		remove(outFilename.c_str());
 		ofstream oneStatFile(outFilename.c_str(), ios::app);
 
-		// N cicli di test 
+		// N cicli di test
 		for(int nciclo=0;nciclo < NCICLI;nciclo++) {
 
 			frame = imread(DIR_IMG + aux);
@@ -170,7 +173,8 @@ int main(int argc, char* argv[]) {
 			duration = static_cast<double>(cv::getTickCount());
 			totDuration  = static_cast<double>(cv::getTickCount());
 
-			found = funz(frame.clone());
+			//found = funz(frame.clone());
+			cout << diffXorMat(frame,frame) << endl;
 
 			duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
 			totDuration = (static_cast<double>(cv::getTickCount()) - totDuration) / getTickFrequency();
@@ -471,6 +475,7 @@ double angle(Point pt1, Point pt2, Point pt0) {
 }
 
 void findSquares(const Mat& image, vector<vector<Point> >& squares) {
+
 	squares.clear();
 
 	Mat pyr, timg, gray0(image.size(), CV_8U), gray;
@@ -685,18 +690,7 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 
 	/***  Mia modifica che migliore i triangoli ***/
 
-	int n=0,m=0;
-	for(int k = 0; k < timg.rows ; k++ ){
-		for(int y = 0; y < timg.rows ; y++ ){
-			Vec3b data = timg.at<Vec3b>(k,y);
-			m += (int) (data[0] + data[1] + data[2])/3;
-			n++;
-		}
-	}
-
-	m = m/n;
-
-	cv::threshold( timg, timg, m, 255 ,0 );
+	timg = setWhiteBlack(timg);
 
 	/******/
 
@@ -706,7 +700,7 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 	findContours(gray, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
 
 
-	//imshow("tri", timg);
+	imshow("tri", timg);
 	vector<Point> approx;
 
 	// test each contour
@@ -847,3 +841,4 @@ bool is_dir(const char* path) {
     lstat(path, &buf);
     return S_ISDIR(buf.st_mode);
 }
+
