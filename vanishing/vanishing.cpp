@@ -105,7 +105,7 @@ Point VanPoint::vanishingPoint(Mat frame){
 	
     circle(mframe,vani,mframe.rows/32.0, Scalar(0,255,255),-1,8);
 
-	imshow("Normal",mframe);
+	//imshow("Normal",mframe);
 
 	free(aux);
 	free(out);

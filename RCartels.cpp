@@ -107,6 +107,8 @@ bool is_dir(const char* path) ;
 ofstream durationStat;
 double duration=0,totDuration=0;
 int cartTrovati = 0;
+Mat circo,croce;
+int prova = 0;
 
 int main(int argc, char* argv[]) {
 
@@ -168,13 +170,13 @@ int main(int argc, char* argv[]) {
 		// N cicli di test
 		for(int nciclo=0;nciclo < NCICLI;nciclo++) {
 
+			cout << DIR_IMG + aux << endl;
 			frame = imread(DIR_IMG + aux);
 			//frame = imread(DIR_IMG + "strada.jpg");
 			duration = static_cast<double>(cv::getTickCount());
 			totDuration  = static_cast<double>(cv::getTickCount());
 
-			//found = funz(frame.clone());
-			cout << diffXorMat(frame,frame) << endl;
+			found = funz(frame.clone());
 
 			duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
 			totDuration = (static_cast<double>(cv::getTickCount()) - totDuration) / getTickFrequency();
@@ -212,6 +214,8 @@ int main(int argc, char* argv[]) {
 
 	}
 	closedir(d);
+
+	cout << "Cartelli trovati: " << prova << endl;
 
 	if(tri!=0) mtri = mtri / tri;
 	if(squa!=0) msqua = msqua / squa;
@@ -262,9 +266,9 @@ string funz(Mat frame){
 	cout << duration << " Before vani" << endl;
 	duration = static_cast<double>(cv::getTickCount());
 
-	VanPoint prova;
+	/*VanPoint prova;
 	Point p = prova.vanishingPoint(frameGray);
-	cout << p << endl;
+	cout << p << endl;*/
 
 	duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
 	cout << duration << " Vani time" << endl;
@@ -643,6 +647,7 @@ bool isDuplicatedTriangle(const vector<Point>& toCheck,
 	}
 	return false;
 }
+
 double getDistance(const Point& a, const Point& b) {
 	return sqrt(((a.x - b.x) * (a.x - b.x)) + ((a.y - b.y) * (a.y - b.y)));
 }
@@ -650,6 +655,18 @@ double getDistance(const Point& a, const Point& b) {
 void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals) {
 
 	cartTrovati ++;
+
+	Mat m1 = imread("cart1.jpg");
+	Mat m2 = imread("cart2.jpg");
+	Mat m3 = imread("cart3.jpg");
+
+	cvtColor(m1, m1, CV_BGR2GRAY);
+	cvtColor(m2, m2, CV_BGR2GRAY);
+	cvtColor(m3, m3, CV_BGR2GRAY);
+
+	cout << " ------ Diff 1 " << diffXorMat(m1,img) << " ------ " << endl;
+	//cout << " ------ Diff 2 " << diffXorMat(m2,img) << " ------ " << endl;
+	//cout << " ------ Diff 3 " << diffXorMat(m3,img) << " ------ " << endl;
 
 	/*namedWindow("tri", WINDOW_NORMAL);
 	imshow("tri",img);*/
@@ -690,7 +707,7 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 
 	/***  Mia modifica che migliore i triangoli ***/
 
-	timg = setWhiteBlack(timg);
+	//setWhiteBlack(timg);
 
 	/******/
 
@@ -700,7 +717,7 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 	findContours(gray, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
 
 
-	imshow("tri", timg);
+	//imshow("tri", timg);
 	vector<Point> approx;
 
 	// test each contour
