@@ -656,17 +656,17 @@ void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals)
 
 	cartTrovati ++;
 
-	Mat m1 = imread("cart1.jpg");
-	Mat m2 = imread("cart2.jpg");
-	Mat m3 = imread("cart3.jpg");
+	Mat m1 = imread("InCart/cart1.jpg");
+	Mat m2 = imread("InCart/cart2.jpg");
+	Mat m3 = imread("InCart/cart3.jpg");
 
 	cvtColor(m1, m1, CV_BGR2GRAY);
 	cvtColor(m2, m2, CV_BGR2GRAY);
 	cvtColor(m3, m3, CV_BGR2GRAY);
 
-	cout << " ------ Diff 1 " << diffXorMat(m1,img) << " ------ " << endl;
+	//cout << " ------ Diff 1 " << diffXorMat(m1,img) << " ------ " << endl;
 	//cout << " ------ Diff 2 " << diffXorMat(m2,img) << " ------ " << endl;
-	//cout << " ------ Diff 3 " << diffXorMat(m3,img) << " ------ " << endl;
+	cout << " ------ Diff 3 " << diffXorMat(m3,img) << " ------ " << endl;
 
 	/*namedWindow("tri", WINDOW_NORMAL);
 	imshow("tri",img);*/

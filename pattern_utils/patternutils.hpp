@@ -14,7 +14,7 @@
 using namespace std;
 using namespace cv;
 
-const int RESIZE = 400;
+const int RESIZE = 200;
 
 // calcola la differenza
 double diffXorMat(Mat mat1,Mat mat2);

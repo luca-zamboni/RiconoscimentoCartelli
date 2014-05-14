@@ -16,8 +16,8 @@ double diffXorMat(Mat ma1,Mat ma2){
 	resize(mat1,mat1,Size(RESIZE,RESIZE));
 	resize(mat2,mat2,Size(RESIZE,RESIZE));
 
-	namedWindow("Mat1", WINDOW_NORMAL);
-	namedWindow("Mat2", WINDOW_NORMAL);
+	/*namedWindow("Mat1", WINDOW_NORMAL);
+	namedWindow("Mat2", WINDOW_NORMAL);*/
 
 	mat1 = setWhiteBlack(mat1);
 	mat2 = setWhiteBlack(mat2);
@@ -30,8 +30,8 @@ double diffXorMat(Mat ma1,Mat ma2){
 	resize(mat1,mat1,Size(RESIZE,RESIZE));
 	resize(mat2,mat2,Size(RESIZE,RESIZE));
 
-	imshow("Mat1",mat1);
-	imshow("Mat2",mat2);
+	/*imshow("Mat1",mat1);
+	imshow("Mat2",mat2);*/
 
 	int m1,m2;
 	for(int k = 0; k < RESIZE; k++ ){

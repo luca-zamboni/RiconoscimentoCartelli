@@ -1,17 +1,31 @@
-all: rcartels
+RICCARTELS=rcartels
+OBJVANI=vanishing/vani.o
+OBJLSD=vanishing/lsd.o
+OBJPATTUTIL=pattern_utils/patutil.o
+CC=g++
+OBJFLAGS=-w -c -std=c++11
+FLAGS=-fpermissive -std=c++11 -w
+OUT=app
+OBJECTS=$(OBJVANI) $(OBJPATTUTIL) $(OBJLSD)
+SOURCE=RCartels.cpp
+LIBS=`pkg-config --cflags --libs opencv`
 
-rcartels: lsd.o vani.o patutil.o
-	g++ -fpermissive -std=c++11 -w lsd.o vani.o patutil.o RCartels.cpp -o app `pkg-config --cflags --libs opencv`
-	rm -rf patutil.o
+
+
+all: $(RICCARTELS)
+
+$(RICCARTELS): $(OBJECTS)
+	$(CC) $(FLAGS) $(OBJECTS) $(SOURCE) -o $(OUT) $(LIBS)
+	rm -rf pattern_utils/patutil.o
 	
-lsd.o:
-	g++ -w -c vanishing/lsd/lsd.h vanishing/lsd/lsd.c
+$(OBJLSD):
+	$(CC) $(OBJFLAGS) vanishing/lsd/lsd.h vanishing/lsd/lsd.c -o $(OBJLSD)
 
-vani.o:
-	g++ -w -c -std=c++11  vanishing/vanishing.cpp -o vani.o
+$(OBJVANI):
+	$(CC) $(OBJFLAGS) vanishing/vanishing.cpp -o $(OBJVANI)
 
-patutil.o:
-	g++ -w -c -std=c++11  pattern_utils/patternutils.cpp -o patutil.o
+$(OBJPATTUTIL):
+	$(CC) $(OBJFLAGS) pattern_utils/patternutils.cpp -o $(OBJPATTUTIL)
 
 clean:
-	rm -rf *.o app
+	rm -rf $(OBJECTS) $(OUT)
