@@ -16,22 +16,23 @@ double diffXorMat(Mat ma1,Mat ma2){
 	resize(mat1,mat1,Size(RESIZE,RESIZE));
 	resize(mat2,mat2,Size(RESIZE,RESIZE));
 
-	/*namedWindow("Mat1", WINDOW_NORMAL);
-	namedWindow("Mat2", WINDOW_NORMAL);*/
 
 	mat1 = setWhiteBlack(mat1);
 	mat2 = setWhiteBlack(mat2);
+
 
 	mat1 = cutBorderByColor(mat1,0,false);
 	mat1 = cutBorderByColor(mat1,0,true);
 	mat2 = cutBorderByColor(mat2,0,false);
 	mat2 = cutBorderByColor(mat2,0,true);
-
 	resize(mat1,mat1,Size(RESIZE,RESIZE));
 	resize(mat2,mat2,Size(RESIZE,RESIZE));
-
-	/*imshow("Mat1",mat1);
+	
+	/*namedWindow("Mat1", WINDOW_NORMAL);
+	namedWindow("Mat2", WINDOW_NORMAL);
+	imshow("Mat1",ma2);
 	imshow("Mat2",mat2);*/
+
 
 	int m1,m2;
 	for(int k = 0; k < RESIZE; k++ ){
@@ -60,7 +61,7 @@ Mat setWhiteBlack(Mat mat){
 		}
 	}
 	m = m/n;
-	cv::threshold( mat, mat,  m/2, 255, 0);
+	cv::threshold( mat, mat,  m, 255, 0);
 	return mat;
 }
 

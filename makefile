@@ -1,4 +1,4 @@
-RICCARTELS=rcartels
+MAINAPP=rcartels
 OBJVANI=vanishing/vani.o
 OBJLSD=vanishing/lsd.o
 OBJPATTUTIL=pattern_utils/patutil.o
@@ -12,11 +12,10 @@ LIBS=`pkg-config --cflags --libs opencv`
 
 
 
-all: $(RICCARTELS)
+all: $(MAINAPP)
 
-$(RICCARTELS): $(OBJECTS)
+$(MAINAPP): $(OBJECTS)
 	$(CC) $(FLAGS) $(OBJECTS) $(SOURCE) -o $(OUT) $(LIBS)
-	rm -rf pattern_utils/patutil.o
 	
 $(OBJLSD):
 	$(CC) $(OBJFLAGS) vanishing/lsd/lsd.h vanishing/lsd/lsd.c -o $(OBJLSD)

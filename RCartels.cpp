@@ -9,15 +9,11 @@
 
 #include <iostream>
 #include <opencv2/opencv.hpp>
-
 #include <vector>
 #include <fstream>
-
 #include <string.h> 
-
 #include <dirent.h> 
 #include <stdio.h> 
-
 #include <sys/stat.h>
 
 #include "vanishing/vanishing.h"
@@ -26,17 +22,18 @@
 using namespace cv;
 using namespace std;
 
+
 class ROI_Rect {
-private:
-	Rect ROI;
-	vector<Point> Rect;
-public:
-	ROI_Rect(cv::Rect RROI, vector<Point> RRect);
-	cv::Rect getROI() {
-		return ROI;
-	}
-	vector<Point> getRect() {
-		return Rect;
+	private:
+		Rect ROI;
+		vector<Point> Rect;
+	public:
+		ROI_Rect(cv::Rect RROI, vector<Point> RRect);
+		cv::Rect getROI() {
+			return ROI;
+		}
+		vector<Point> getRect() {
+			return Rect;
 	}
 };
 ROI_Rect::ROI_Rect(cv::Rect RROI, vector<Point> RRect) {
@@ -65,8 +62,7 @@ GeomSignal::GeomSignal(string nname, Mat iimage_ROI, Rect rrect_ROI) {
 	name = nname;
 	image_ROI = iimage_ROI;
 	rect_ROI = rrect_ROI;
-}
-;
+};
 
 bool yComparator(const Point& a, const Point& b);
 bool isDuplicatedSquare(const vector<Point>& toCheck,
@@ -82,41 +78,39 @@ void findSquares(const Mat& image, vector<vector<Point> >& squares);
 void drawSquares(Mat& image, const vector<vector<Point> >& squares);
 const double ERROR_LEN = 1 / 2.5;
 const double DISCARD_CORNERS_PIXEL = 30;
-void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& signals);
+int findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& signals,vector<Mat> cartels);
+vector<int> funz(Mat frame,vector<Mat> cartels);
 
 const float PROPORZ_CARTELLO_SEGNALE = 1.3;
 
 const float PROPORZ_LARGHEZZA_ROI = 2.5;
 
 float focL = 1394.589220272376;
-float objSIZE = 8;
+float objSIZE = 4;
 
 double minEdge = focL * objSIZE / 300;
-double minArea = minEdge;
+double minArea = minEdge * minEdge;
 
 double maxEdge = focL * objSIZE / 30;
 double maxArea = maxEdge * maxEdge;
 
-double MAXERRORRATE = 0.1;
+double MINPRECISION = 0.75;
 
+string DIR_CARTEL = "./Cart/";
 string DIR_IMG = "./Test_img/";
 string FORMA = "";
 
-string funz(Mat frame);
 bool is_dir(const char* path) ;
-ofstream durationStat;
 double duration=0,totDuration=0;
 int cartTrovati = 0;
-Mat circo,croce;
-int prova = 0;
 
 int main(int argc, char* argv[]) {
 
 	double nciclo = 1;
 	Mat frame;
-	float media = 0,mtri=0,mcirc=0,msqua=0;
-	int NCICLI = 20,tri=0,squa=0,circ=0,count=0;
-	string NOT_FOUND = "null";
+	float media = 0;
+	int NCICLI = 20,count=0;
+	int auxFound = 0;
 
 	if(argc!=3){
 		FORMA = "C";
@@ -139,13 +133,21 @@ int main(int argc, char* argv[]) {
 	//namedWindow("Normal", WINDOW_NORMAL);
 	//namedWindow("Immaginisenzarumore", WINDOW_NORMAL);
 
-	remove("./FileOutput/GlobalStat.txt");
-	ofstream statFile("./FileOutput/GlobalStat.txt", ios::app);
+	vector<Mat> cartel;
 
-	remove("./FileOutput/DurationStat.txt");
-	durationStat.open("./FileOutput/DurationStat.txt", ios::app);
+	struct dirent **namelist;
+	int n;
+	n = scandir(DIR_CARTEL.c_str(), &namelist, 0, alphasort);
+	while (n--) {
+		if(is_dir((DIR_CARTEL+namelist[n]->d_name).c_str())){
+			continue;
+		}
+		frame = imread(DIR_CARTEL+namelist[n]->d_name);
+		cartel.push_back(frame);
+	}
+	reverse(cartel.begin(),cartel.end());
+	vector<int> founded(cartel.size(),0);
 
-	string filename = "";
 	DIR *d;
 	struct dirent *dir;
 	d = opendir(DIR_IMG.c_str());
@@ -156,92 +158,51 @@ int main(int argc, char* argv[]) {
 		}
 
 		count++;
-
 		string aux(dir->d_name);
-		string outFilename = "./FileOutput/"+FORMA+"/"+aux.substr(0,aux.size()-3)+"txt";
-
 		media = 0;
-		string found = NOT_FOUND;
-		string auxFound = NOT_FOUND;
-
-		remove(outFilename.c_str());
-		ofstream oneStatFile(outFilename.c_str(), ios::app);
-
+		vector<int> found;
+		auxFound = 0;
 		// N cicli di test
 		for(int nciclo=0;nciclo < NCICLI;nciclo++) {
-
 			cout << DIR_IMG + aux << endl;
 			frame = imread(DIR_IMG + aux);
 			//frame = imread(DIR_IMG + "strada.jpg");
 			duration = static_cast<double>(cv::getTickCount());
 			totDuration  = static_cast<double>(cv::getTickCount());
 
-			found = funz(frame.clone());
+			found = funz(frame.clone(),cartel);
 
 			duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
 			totDuration = (static_cast<double>(cv::getTickCount()) - totDuration) / getTickFrequency();
-			cout << totDuration << " total Duration " << endl;
-			cout << cartTrovati << " Cartelli trovati " << endl << endl;
+			cout << totDuration << " total Duration " << endl << endl;
 			cartTrovati=0;
-
-			if(found != NOT_FOUND){
-				auxFound = found;
-			}
-			oneStatFile << found << " \t\t- " << totDuration << ";" << endl;
 			media += totDuration;
 			waitKey(1000);
-
 		}
 
-		if(auxFound != NOT_FOUND){
-			if(auxFound == "Triang"){
-				tri++;
-				mtri += totDuration;
-			}
-			if(auxFound == "Circle"){
-				circ++;
-				mcirc += totDuration;
-			}
-			if(auxFound == "Square"){
-				squa++;
-				msqua += totDuration;
-			}
+		for(int i=0;i<found.size();i++){
+			founded[found[i]]++;
 		}
 
 		media = media / NCICLI;
-		oneStatFile << "Media : " << media << endl;
-		oneStatFile.close();
 
 	}
 	closedir(d);
 
-	cout << "Cartelli trovati: " << prova << endl;
-
-	if(tri!=0) mtri = mtri / tri;
-	if(squa!=0) msqua = msqua / squa;
-	if(circ!=0) mcirc = mcirc / circ;
-
-	statFile << "N-Input : \t" << count << "\t Riconosciuti : " << (tri+circ+squa) << endl;
-	statFile << "Triangl : \t" << tri << "\t t-medio : \t" << mtri << endl;
-	statFile << "Circles : \t" << circ << "\t t-medio : \t" << mcirc << endl;
-	statFile << "Squares : \t" << squa << "\t t-medio : \t" << msqua << endl;
-	statFile << "N Cicli : \t" << NCICLI;
-
-	cout << "N-Input : \t" << count << "\t Riconosciuti : " << (tri+circ+squa) << endl;
-	cout << "Triangl : \t" << tri << "\t t-medio : \t" << mtri << endl;
-	cout << "Circles : \t" << circ << "\t t-medio : \t" << mcirc << endl;
-	cout << "Squares : \t" << squa << "\t t-medio : \t" << msqua << endl;
-	cout << "N Cicli : \t" << NCICLI << endl;
-
-	statFile.close();
-	durationStat.close();
+	int totalRiconosciuti = 0;
+	cout << endl << "N-Input : \t" << count << "\tN Cicli : \t" << NCICLI << endl;
+	for(int i=0;i<cartel.size();i++){
+		cout << "Cart"<<to_string(i+1)<<" : \t" << founded[i] << endl;
+		totalRiconosciuti += founded[i];
+	}
+	cout << "Riconosciuti : \t" << totalRiconosciuti << endl;
 
 	cvDestroyAllWindows();
 	// the camera will be deinitialized automatically in VideoCapture destructor
 	return 0;
 }
 
-string funz(Mat frame){
+vector<int> funz(Mat frame,vector<Mat> cartels){
 
 	int numRoi = 0;
 	int numTri = 0;
@@ -258,7 +219,6 @@ string funz(Mat frame){
 	int N_Signal = 0;
 	Mat frameGray; // frame in bianco e nero
 	Mat normal;
-	string ret = "null";
 
 	cvtColor(frame, frameGray, CV_BGR2GRAY);
 
@@ -372,6 +332,8 @@ string funz(Mat frame){
 
 	vector<ROI_Rect*>::iterator it1;
 	vector<Point> vp;
+
+	vector<int> ret;
 	for (it1 = vectROI_Rect.begin(); it1 != vectROI_Rect.end(); ++it1) {
 
 		vp = (*it1)->getRect();
@@ -407,51 +369,30 @@ string funz(Mat frame){
 		imshow("perspective", perspective);*/
 
 		Rect ROI = (*it1)->getROI();
-		findGeometricSignal(perspective, ROI, geomSignals);
+		ret.push_back(findGeometricSignal(perspective, ROI, geomSignals,cartels));
 	}
 
 	duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
 	cout << duration << " Lavorazione quadrati con forme geometrihe" << endl;
 	duration = static_cast<double>(cv::getTickCount());
 	//cout << "N segnali trovati: " << geomSignals.size() << endl;
-	N_Signal = geomSignals.size();
-	unsigned int nTriangle = 0;
-	unsigned int nCircle = 0;
 
 	vector<GeomSignal*>::reverse_iterator rit;
 	int i = geomSignals.size() - 1;
 	for (rit = geomSignals.rbegin(); rit != geomSignals.rend(); ++rit) {
-		if ((*rit)->getName() == "Triangle") {
-			nTriangle++;
-		} else if ((*rit)->getName() == "Circle") {
-			nCircle++;
-		}
-
-		ret = (*rit)->getName();
-		
 		putText(normal, (*rit)->getName(),
 				Point((*rit)->getRectROI().x,
 						(*rit)->getRectROI().y
 								+ (*rit)->getRectROI().height),
 				cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 0, 0), 2,
 				true);
-
-
-
 		delete *rit;
 		geomSignals[i] = geomSignals[geomSignals.size() - 1];
 		geomSignals.pop_back();
-
-		// decremento l'indice posizionale dell'array
 		i--;
 	}
 
-	//imshow("Immagini", normal);
-	
-
-	numRoi += N_ROI;
-	numCir += nCircle;
-	numTri += nTriangle;
+	imshow("Immagini", normal);
 
 	// clear data arrays
 	squares.clear();
@@ -465,6 +406,7 @@ string funz(Mat frame){
 	if (geomSignals.size() > 0) {
 		geomSignals.clear();
 	}
+
 	return ret;
 }
 
@@ -519,7 +461,7 @@ void findSquares(const Mat& image, vector<vector<Point> >& squares) {
 
 		if (approx.size() == 4 && contourArea(Mat(approx)) > minArea
 				&& contourArea(Mat(approx)) < maxArea
-				/*&& isContourConvex(Mat(approx))*/) {
+				&& isContourConvex(Mat(approx))) {
 			double maxCosine = 0;
 
 			Rect ROI;
@@ -629,228 +571,25 @@ bool isDuplicatedSquare(const vector<Point>& toCheck,
 	}
 	return false;
 }
-bool isDuplicatedTriangle(const vector<Point>& toCheck,
-		const vector<vector<Point> >& triangles) {
-	for (size_t i = 0; i < triangles.size(); i++) {
-		const vector<Point>* curr_triangle = &triangles[i];
-
-		// se i rispettivi 3 vertici distano tra loro
-		// meno di DISCARD_CORNERS_PIXEL ritorna true
-		if ((getDistance(toCheck[0], curr_triangle[0][0])
-				<= DISCARD_CORNERS_PIXEL)
-				&& (getDistance(toCheck[1], curr_triangle[0][1])
-						<= DISCARD_CORNERS_PIXEL)
-				&& (getDistance(toCheck[2], curr_triangle[0][2])
-						<= DISCARD_CORNERS_PIXEL)) {
-			return true;
-		}
-	}
-	return false;
-}
 
 double getDistance(const Point& a, const Point& b) {
 	return sqrt(((a.x - b.x) * (a.x - b.x)) + ((a.y - b.y) * (a.y - b.y)));
 }
 
-void findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals) {
+int findGeometricSignal(Mat& img, Rect& ROI, vector<GeomSignal*>& geomeSignals,vector<Mat> cartels) {
 
-	cartTrovati ++;
-
-	Mat m1 = imread("InCart/cart1.jpg");
-	Mat m2 = imread("InCart/cart2.jpg");
-	Mat m3 = imread("InCart/cart3.jpg");
-
-	cvtColor(m1, m1, CV_BGR2GRAY);
-	cvtColor(m2, m2, CV_BGR2GRAY);
-	cvtColor(m3, m3, CV_BGR2GRAY);
-
-	//cout << " ------ Diff 1 " << diffXorMat(m1,img) << " ------ " << endl;
-	//cout << " ------ Diff 2 " << diffXorMat(m2,img) << " ------ " << endl;
-	cout << " ------ Diff 3 " << diffXorMat(m3,img) << " ------ " << endl;
-
-	/*namedWindow("tri", WINDOW_NORMAL);
-	imshow("tri",img);*/
-	
-
-	//duration = static_cast<double>(cv::getTickCount());
-
-	Mat result = img.clone();
-	int lato_img = img.size().width;
-	Mat img_find_circles = img.clone();
-
-	GaussianBlur(img_find_circles, img_find_circles, cv::Size(3, 3), 0.5);
-
-	vector<Vec3f> circles;
-	HoughCircles(img_find_circles, circles, CV_HOUGH_GRADIENT, 2, 50, 80, 40, 0, 1000); 
-
-	if (circles.size() > 0) {
-		vector<Vec3f>::reverse_iterator rit_c;
-		int i = circles.size() - 1;
-		for (rit_c = circles.rbegin(); rit_c != circles.rend(); ++rit_c) {
-			if (lato_img / (*rit_c)[2] <= PROPORZ_CARTELLO_SEGNALE) {
-				circles[i] = circles[circles.size() - 1];
-				circles.pop_back();
-			}
-			i--;
+	int indexMax=-1;
+	double maxVal=-1;
+	for(int i = 0;i<cartels.size();i++){
+		cvtColor(cartels[i], cartels[i], CV_BGR2GRAY);
+		double diff = diffXorMat(cartels[i],img);
+		if(max(diff,maxVal) == diff && diff > MINPRECISION){
+			maxVal = diff; indexMax=i;
 		}
 	}
-
-
-	Mat pyr, timg, gray0(img.size(), CV_8U), gray;
-	// down-scale and upscale the image to filter out the noise
-	pyrDown(img, pyr, Size(img.cols / 2, img.rows / 2));
-	pyrUp(pyr, timg, img.size());
-	vector<vector<Point> > contours;
-
-
-	vector<vector<Point> > triangles;
-
-	/***  Mia modifica che migliore i triangoli ***/
-
-	//setWhiteBlack(timg);
-
-	/******/
-
-	Canny(timg, gray, 155, 255, 3);
-
-	// find contours and store them all as a list
-	findContours(gray, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
-
-
-	//imshow("tri", timg);
-	vector<Point> approx;
-
-	// test each contour
-	for (size_t i = 0; i < contours.size(); i++) {
-		// approximate contour with accuracy proportional
-		// to the contour perimeter
-		approxPolyDP(Mat(contours[i]), approx,
-				arcLength(Mat(contours[i]), true) * 0.05, true);
-
-		if (approx.size() == 3) {
-
-			double maxCosine = 0;
-
-			for (int j = 2; j < 4; j++) {
-				// find the maximum cosine of the angle between joint edges
-				double cosine = fabs(
-						angle(approx[j % 4], approx[j - 2], approx[j - 1]));
-				maxCosine = MAX(maxCosine, cosine);
-			}
-
-			if (maxCosine > 0.3 && maxCosine < 0.7) {
-				std::stable_sort(approx.begin(), approx.end(), yComparator);
-				if (approx[1].x > approx[2].x) {
-					Point tmp = approx[1];
-					approx[1] = approx[2];
-					approx[2] = tmp;
-				}
-
-				double edgeLength[3] = { 0.0, 0.0, 0.0 };
-				edgeLength[0] = getDistance(approx[0], approx[1]);
-				edgeLength[1] = getDistance(approx[1], approx[2]);
-				edgeLength[2] = getDistance(approx[2], approx[0]);
-
-				if (lato_img / edgeLength[0] > PROPORZ_CARTELLO_SEGNALE
-						&& lato_img / edgeLength[1] > PROPORZ_CARTELLO_SEGNALE
-						&& lato_img / edgeLength[2] > PROPORZ_CARTELLO_SEGNALE) {
-					if (fabs(edgeLength[0] - edgeLength[1])
-							< (MAX(edgeLength[0], edgeLength[1]) * ERROR_LEN)
-							&& fabs(edgeLength[1] - edgeLength[2])
-									< (MAX(edgeLength[1], edgeLength[2])
-											* ERROR_LEN)
-							&& fabs(edgeLength[0] - edgeLength[2])
-									< (MAX(edgeLength[0], edgeLength[2])
-											* ERROR_LEN)) {
-						//controlla che nn sia un duplicato di qualche altro triangle
-						if (!isDuplicatedTriangle(approx, triangles)) {
-							triangles.push_back(approx);
-						}
-					}
-				}
-			}
-		}
-
-	}
-
-	int raggioIntorno = img.size().width / (2.1 * 2 * 1.732050808);
-	Point center_img(img.size().width / 2, img.size().height / 2);
-
-	double distance_from_center_img;
-
-	if (circles.size() > 0) {
-		vector<Vec3f>::reverse_iterator rit_c;
-		int i = circles.size() - 1;
-		for (rit_c = circles.rbegin(); rit_c != circles.rend(); ++rit_c) {
-			distance_from_center_img = getDistance(center_img,
-					Point((*rit_c)[0], (*rit_c)[1]));
-			if (distance_from_center_img > raggioIntorno) {
-				circles[i] = circles[circles.size() - 1];
-				circles.pop_back();
-			}
-			i--;
-		}
-	}
-	if (triangles.size() > 0) {
-		vector<vector<Point> >::reverse_iterator rit_t;
-		int i = triangles.size() - 1;
-		for (rit_t = triangles.rbegin(); rit_t != triangles.rend(); ++rit_t) {
-			Moments mom = moments(*rit_t);
-			//position of mass  center converted to integer
-			Point centerT(mom.m10 / mom.m00, mom.m01 / mom.m00);
-			distance_from_center_img = getDistance(center_img, centerT);
-			if (distance_from_center_img > raggioIntorno) {
-				triangles[i] = triangles[triangles.size() - 1];
-				triangles.pop_back();
-			}
-			i--;
-		}
-	}
-
-	char name = 'N';
-	double minArea = -1;
-	double area;
-
-	if (circles.size() > 0) {
-		vector<Vec3f>::const_iterator it_c = circles.begin();
-		while (it_c != circles.end()) {
-
-			area = ((*it_c)[2]) * 3.1415926535;
-			if (area < minArea || minArea == -1) {
-				minArea = area;
-				name = 'C';
-			}
-
-			++it_c;
-		}
-	}
-	if (triangles.size() > 0) {
-//		drawContours(result, triangles, -1, cv::Scalar(161, 0, 244), 1); // with a thickness of 1
-		vector<vector<Point> >::const_iterator it_t = triangles.begin();
-		while (it_t != triangles.end()) {
-			area = contourArea((*it_t), false);
-			if (area < minArea || minArea == -1) {
-				minArea = area;
-				name = 'T';
-			}
-
-			++it_t;
-		}
-	}
-
-	if (name == 'C') {
-		geomeSignals.push_back(new GeomSignal("Circle", img, ROI));
-	} else if (name == 'T') {
-		geomeSignals.push_back(new GeomSignal("Triang", img, ROI));
-	} else if (name == 'N') {
-		// none to add
-	}
-
-	/*duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
-	cout << duration << " time di ricerca forme geometriche" << endl;
-	duration = static_cast<double>(cv::getTickCount());*/
-
-	//imshow("result", result);
+	string name = "cart"+to_string(indexMax);
+	geomeSignals.push_back(new GeomSignal(name, img, ROI));
+	return indexMax;
 }
 
 bool is_dir(const char* path) {
