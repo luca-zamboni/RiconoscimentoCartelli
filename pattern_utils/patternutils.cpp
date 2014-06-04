@@ -43,7 +43,6 @@ double diffXorMat(Mat ma1,Mat ma2){
 			if(m1 == m2){
 				countUguali++;
 			}
-			
 		}
 	}
 

@@ -4,13 +4,11 @@ OBJLSD=vanishing/lsd.o
 OBJPATTUTIL=pattern_utils/patutil.o
 CC=g++
 OBJFLAGS=-w -c -std=c++11
-FLAGS=-fpermissive -std=c++11 -w
+FLAGS=-std=c++11 -w
 OUT=app
 OBJECTS=$(OBJVANI) $(OBJPATTUTIL) $(OBJLSD)
-SOURCE=RCartels.cpp
+SOURCE=main.cpp RCartel.cpp RCartel.hpp
 LIBS=`pkg-config --cflags --libs opencv`
-
-
 
 all: $(MAINAPP)
 
