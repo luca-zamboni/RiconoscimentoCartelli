@@ -10,7 +10,12 @@
 #include <stdio.h> 
 #include <sys/stat.h>
 
+/* Dipendenze */  
+
+/* vanishing per calcolare il vanishing point */
 #include "vanishing/vanishing.h"
+
+/* Per fare il pattern matching per i cartelli */
 #include "pattern_utils/patternutils.hpp"
 
 using namespace cv;
@@ -19,6 +24,8 @@ using namespace std;
 class RCartel{
 
 	private:
+
+		/*Classi ausiliarie*/
 		class ROI_Rect {
 			private:
 				Rect ROI;
@@ -32,7 +39,6 @@ class RCartel{
 					return rect;
 				}
 		};
-
 		class GeomSignal {
 			private:
 				string name;
@@ -50,26 +56,33 @@ class RCartel{
 					return rect_ROI;
 				}
 		};
-		int thresh = 50, N = 11;
-		const double ERROR_LEN = 1 / 2.5;
-		const double DISCARD_CORNERS_PIXEL = 30;
-		const float PROPORZ_CARTELLO_SEGNALE = 1.3;
-		const float PROPORZ_LARGHEZZA_ROI = 2.5;
-		float focL = 1394.589220272376;
-		float objSIZE = 4;
-		double minEdge = focL * objSIZE / 300;
-		double minArea = minEdge * minEdge;
-		double maxEdge = focL * objSIZE / 30;
-		double maxArea = maxEdge * maxEdge;
 
-		double MINPRECISION = 0.70;
-		double PCVANI = 0.3;
-		double duration=0,totDuration=0;
-		int cartTrovati = 0;
-		bool van = true;
+		int CONST_RESIZE;
+		double ERROR_LEN;
+		double DISCARD_CORNERS_PIXEL;
+		float PROPORZ_CARTELLO_SEGNALE;
+		float PROPORZ_LARGHEZZA_ROI;
+		float focL;
+		float objSIZE;
+		double minEdge;
+		double minArea;
+		double maxEdge;
+		double maxArea;
+
+		/*Precisione minima del pattern matching*/
+		double MINPRECISION;
+
+		/*Percentuale di foto intorno al vanishing point*/
+		double PCVANI;
+
+		/*Parametri per debug*/
+		double duration,totDuration;
+		int cartTrovati;
+
+		/*van: vanishing point già calcolato -- vani: vanishing point calcolato*/
+		bool van;
 		Point vani;
 
-		bool yComparator(const Point& a, const Point& b);
 		bool isDuplicatedSquare(const vector<Point>& toCheck,const vector<vector<Point> >& squares);
 		bool isDuplicatedTriangle(const vector<Point>& toCheck,const vector<vector<Point> >& triangles);
 		double getDistance(const Point& a, const Point& b);
@@ -79,9 +92,28 @@ class RCartel{
 		void drawSquares(Mat& image, const vector<vector<Point> >& squares);
 		vector<int> searchSign(Mat frame,vector<Mat> cartels);
 
+		struct Comp {
+		    bool operator() (cv::Point a, cv::Point b) { return a.y < b.y; }
+		} YComparator;
+
 	public:
+		/*Costruttore di base*/
 		RCartel();
+
+		/*
+			Funzione che cerca cartelli nel frame passato in input.
+			I cartelli cercati sono quelli passati con il vettore passato in inut
+			La funzione restituisce l'index corrispondente all' array in input dei cartelli trovati
+			Param
+				Mat frame: 				frame da dare in input
+				vector<Mat> cartels:	vettore di pattern di cartelli da fare pattern matching
+			Return
+				Ritorna un vector<int> contenente gli index dei cartelli trovati in frame
+		*/
 		vector<int> lookForSigns(Mat frame,vector<Mat> cartels);
+
+		/*Pulisce il vanishing point e lo fa ricalcolare sul prossimo frame*/
+		void cleanVanischingPoint();
 
 };
 

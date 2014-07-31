@@ -23,7 +23,6 @@ using namespace std;
 
 string DIR_CARTEL = "./Cart/";
 string DIR_IMG = "./Test_img/";
-string FORMA = "";
 
 bool is_dir(const char* path) ;
 double duration=0,totDuration=0;
@@ -37,27 +36,21 @@ int main(int argc, char* argv[]) {
 	int NCICLI = 20,count=0;
 	int auxFound = 0;
 
-	if(argc!=3){
-		FORMA = "C";
-		NCICLI = 2;
+	if(argc!=2){
+		NCICLI = 1;
 	}
 	else{
-		FORMA = argv[1];
-		NCICLI = atoi(argv[2]);
-		if(FORMA != "C" && FORMA != "S" && FORMA != "T" && FORMA != "V"){
-			cout << " usage : ./app [Form] [Time] " << endl;
-			return 0;
-		}
+		NCICLI = atoi(argv[1]);
 		if(NCICLI < 1 || NCICLI > 100){
 			cout << "Out of range" << endl;
 			return 0;
 		}
 	}
 
-	DIR_IMG += FORMA + "/";
 	//namedWindow("Normal", WINDOW_NORMAL);
 	//namedWindow("Immaginisenzarumore", WINDOW_NORMAL);
 
+	ofstream output("./output.txt", ios::app);
 	vector<Mat> cartel;
 
 	struct dirent **namelist;
@@ -73,17 +66,17 @@ int main(int argc, char* argv[]) {
 	reverse(cartel.begin(),cartel.end());
 	vector<int> founded(cartel.size(),0);
 
-	DIR *d;
-	struct dirent *dir;
-	d = opendir(DIR_IMG.c_str());
-	while ((dir = readdir(d)) != NULL){
+	struct dirent **dir;
+	RCartel a;
+	n = scandir(DIR_IMG.c_str(), &dir, 0, alphasort);
+	for(int y = 0;y<n;y++){
 
-		if(is_dir((DIR_IMG + dir->d_name).c_str())){
+		if(is_dir((DIR_IMG + dir[y]->d_name).c_str())){
 			continue;
 		}
 
 		count++;
-		string aux(dir->d_name);
+		string aux(dir[y]->d_name);
 		media = 0;
 		vector<int> found;
 		auxFound = 0;
@@ -94,28 +87,33 @@ int main(int argc, char* argv[]) {
 			//frame = imread(DIR_IMG + "strada.jpg");
 			duration = static_cast<double>(cv::getTickCount());
 			totDuration  = static_cast<double>(cv::getTickCount());
-
-			RCartel a;
+			
 			found = a.lookForSigns(frame.clone(),cartel);
 
 			duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
 			totDuration = (static_cast<double>(cv::getTickCount()) - totDuration) / getTickFrequency();
-			cout << totDuration << " total Duration " << endl << endl;
+			//cout << totDuration << " total Duration " << endl;
 			cartTrovati=0;
 			media += totDuration;
 			waitKey(1000);
 		}
 
+		//output << DIR_IMG + aux;
+
 		for(int i=0;i<found.size();i++){
-			cout << found[i] << endl;
-			founded[found[i]]++;
+			if(found[i]>=0){
+				founded[found[i]]++;
+				cout << found[i] << endl;
+			}
 		}
 
+		//output << endl;
 		media = media / NCICLI;
+		cout << media << endl << endl;
 
 	}
-	closedir(d);
 
+	//cout << media << endl;
 	int totalRiconosciuti = 0;
 	cout << endl << "N-Input : \t" << count << "\tN Cicli : \t" << NCICLI << endl;
 	for(int i=0;i<cartel.size();i++){

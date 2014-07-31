@@ -13,50 +13,78 @@ RCartel::RCartel::ROI_Rect::ROI_Rect(cv::Rect RROI, vector<Point> RRect) {
 }
 
 RCartel::RCartel(){
+	van = true;
+	vani = Point(0,0);
+	ERROR_LEN = 1 / 2.5;
+	DISCARD_CORNERS_PIXEL = 30;
+	PROPORZ_CARTELLO_SEGNALE = 1.3;
+	PROPORZ_LARGHEZZA_ROI = 2.5;
+	focL = 1394.589220272376;
+	objSIZE = 4;
+	minEdge = focL * objSIZE / 300;
+	minArea = minEdge * minEdge;
+	maxEdge = focL * objSIZE / 30;
+	maxArea = maxEdge * maxEdge;
+	MINPRECISION = 0.70;
+	PCVANI = 0.4;
+	duration=0,totDuration=0;
+	cartTrovati = 0;
+	CONST_RESIZE = 2;
+}
+
+void RCartel::cleanVanischingPoint(){
+	van = true;
 	vani = Point(0,0);
 }
 
 vector<int> RCartel::lookForSigns(Mat frame,vector<Mat> cartels){
 
-	
-	Mat fG;
+	//resize(frame,frame,Size(frame.cols*2,frame.rows*2));
+
+	Mat fG,fG2;
 	Mat normal;
 	cvtColor(frame, fG, CV_BGR2GRAY);
+	cvtColor(frame, fG2, CV_BGR2GRAY);
 
 	normal = frame.clone();
 
-	duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
-	cout << duration << " Before vani" << endl;
-	duration = static_cast<double>(cv::getTickCount());
-
-	
-	Point angUnder(0,0);
-	Point angOver(0,0);
+	/*Point angUnder(0,0);
+	Point angOver(0,0);*/
 
 	VanPoint vaniCalculator;
 
-	/*if(van){
+	if(van){
 		vani = vaniCalculator.vanishingPoint(fG);
+		van = false;
 	}
 
 	Point angOver(std::max((int)(vani.x - fG.cols * PCVANI),0),std::max((int)(vani.y - fG.rows * PCVANI),0));
 	Point angUnder(std::min((int)(vani.x + fG.cols * PCVANI),fG.cols),
 		std::min((int)(vani.y + fG.rows * PCVANI),fG.rows));
-
-	cout << angOver << " " << angUnder << endl;
+	
 	fG = fG.colRange(angOver.x,angUnder.x).rowRange(angOver.y,angUnder.y);
-	//imshow("gray", fG);
-	//cout << prova.van << endl;*/
+	circle(frame,vani,10,Scalar(255,255,255),CV_FILLED,8,0);
+	imshow("sd",frame);
 
-	duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
-	cout << duration << " Vani time" << endl;
-	duration = static_cast<double>(cv::getTickCount());
-	return searchSign(fG,cartels);
+	//resize(fG,fG,Size(fG.cols*2,fG.rows*2));
+	bool ctrl= true;
+	vector<int> ret = searchSign(fG,cartels);
+	for(int i=0;i<ret.size();i++){
+		if(ret[i]>=0){
+			ctrl = false;
+		}
+	}
+	if(ctrl){
+		ret = searchSign(fG2,cartels);
+		van=true;
+	}
+	return ret;
 }
 
 vector<int> RCartel::searchSign(Mat frame,vector<Mat> cartels){
 
 	Mat fG = frame.clone();
+	//imshow("sd",fG);
 
 	int numRoi = 0;
 	int numTri = 0;
@@ -71,15 +99,13 @@ vector<int> RCartel::searchSign(Mat frame,vector<Mat> cartels){
 	int N_Signal = 0;
 	findSquares(fG, squares);
 
-	//circle(normal,vaniCalculator.van,normal.cols/64.0,Scalar(0,0,255),-1,4);
-
-	const vector<Point>* curr_square;
+	vector<Point>* curr_square;
 	Rect ROI;
 	for (size_t i = 0; i < squares.size(); i++) {
-
 		curr_square = &squares[i];
 
 		ROI = cv::boundingRect(cv::Mat(*curr_square));
+
 		Point centerROI(ROI.x + ROI.width / 2, ROI.y + ROI.height / 2);
 		if (vectROI_Rect.size() == 0) {
 			vectROI_Rect.push_back(new ROI_Rect(ROI, *curr_square));
@@ -129,24 +155,11 @@ vector<int> RCartel::searchSign(Mat frame,vector<Mat> cartels){
 	N_ROI = vectROI_Rect.size();
 	int color;
 	vector<ROI_Rect*>::iterator it;
-	for (it = vectROI_Rect.begin(); it != vectROI_Rect.end(); ++it) {
-		//color = rand() % 256;
-		/*Point centerROI_((*it)->getROI().x+ angOver.x + (*it)->getROI().width / 2,
-				(*it)->getROI().y+angOver.y + (*it)->getROI().height / 2);
-
-		//Point auxOver = Point((*it)->getROI().x+ angOver.x,(*it)->getROI().y+ angOver.y);
-		//Point auxUnder = Point((*it)->getROI().x+ angOver.x + (*it)->getROI().width,(*it)->getROI().y+ angOver.y +(*it)->getROI().height);
-		/*cv::rectangle(normal,auxOver , auxUnder
-			, cv::Scalar(255, 255, 0), 2);
-		circle(normal, centerROI_, 2, cv::Scalar(255, 255, 0), 2); // draw dot in the center of ROI*/
-	}
-
 	vector<ROI_Rect*>::iterator it1;
 	vector<Point> vp;
 
 	vector<int> ret;
 	for (it1 = vectROI_Rect.begin(); it1 != vectROI_Rect.end(); ++it1) {
-
 		vp = (*it1)->getRect();
 		int l1 = (int)getDistance(vp[0], vp[1]);
 		int l2 = (int)getDistance(vp[1], vp[2]);
@@ -183,28 +196,18 @@ vector<int> RCartel::searchSign(Mat frame,vector<Mat> cartels){
 
 		ret.push_back(findGeometricSignal(perspective, ROI, geomSignals,cartels));
 	}
-
-	duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
-	cout << duration << " Lavorazione quadrati con forme geometrihe" << endl;
-	duration = static_cast<double>(cv::getTickCount());
 	//cout << "N segnali trovati: " << geomSignals.size() << endl;
 
 	vector<GeomSignal*>::reverse_iterator rit;
 	int i = geomSignals.size() - 1;
 	for (rit = geomSignals.rbegin(); rit != geomSignals.rend(); ++rit) {
-		/*putText(normal, (*rit)->getName(),
-				Point((*rit)->getRectROI().x + angOver.x,
-						(*rit)->getRectROI().y + angOver.y
-								+ (*rit)->getRectROI().height),
-				cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 0, 0), 2,
-				true);*/
 		delete *rit;
 		geomSignals[i] = geomSignals[geomSignals.size() - 1];
 		geomSignals.pop_back();
 		i--;
 	}
 
-	imshow("Immagini", frame);
+	//imshow("Immagini", frame);
 
 	// clear data arrays
 	squares.clear();
@@ -235,113 +238,108 @@ void RCartel::findSquares(const Mat& image, vector<vector<Point> >& squares) {
 
 	squares.clear();
 
+	Mat mimage = image.clone();
 	Mat pyr, timg, gray0(image.size(), CV_8U), gray;
 	Mat cl = image.clone();
 
-	//imshow("Immagini",image);
-	duration = static_cast<double>(cv::getTickCount());
-	pyrDown(image, pyr, Size(image.cols / 2, image.rows / 2));
-	pyrUp(pyr, timg, image.size());
-	vector<vector<Point> > contours;
+	resize(cl,cl,Size(cl.cols*CONST_RESIZE,cl.rows*CONST_RESIZE));
 
-	duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
-	cout << duration << " time di resize" << endl;
-	duration = static_cast<double>(cv::getTickCount());
+	pyrDown(cl, pyr, Size(cl.cols / 2, cl.rows / 2));
+	pyrUp(pyr, timg, cl.size());
+
+	vector<vector<Point> > contours;
 
 	Canny(timg, gray, 250,300 , 5);
 	dilate(gray, gray, Mat(), Point(-1, -1));
-	duration = (static_cast<double>(cv::getTickCount()) - duration) / getTickFrequency();
-	cout << duration << " time di canny" << endl;
-	duration = static_cast<double>(cv::getTickCount());
-
-	
-
-	// find contours and store them all as a list
-	//findContours(gray, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
 	vector<Vec4i> hierarchy;
 	findContours( gray, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
 
-	//imshow("Immaginisenzarumore",gray);
+
+	//imshow("Immaginisenzarumore",timg);
 
 	vector<Point> approx;
 
 	for (size_t i = 0; i < contours.size(); i++) {
-		drawContours( timg, contours, i, Scalar(0,0,255), 2, 8, hierarchy, 0, Point() );
-		approxPolyDP(Mat(contours[i]), approx,
-				arcLength(Mat(contours[i]), true) * 0.02, true);
-
-		if (approx.size() == 4 && contourArea(Mat(approx)) > minArea
-				&& contourArea(Mat(approx)) < maxArea
-				&& isContourConvex(Mat(approx))) {
-			double maxCosine = 0;
-
-			Rect ROI;
-			ROI = cv::boundingRect(cv::Mat(approx));
-			Point centerROI(ROI.x + ROI.width / 2, ROI.y + ROI.height / 2);
-
-			//rectangle( cl, ROI.tl(), ROI.br(), Scalar(255,255,255), 2, 8);
-
-
-			for (int j = 2; j < 5; j++) {
-				// find the maximum cosine of the angle between joint edges
-				double cosine = fabs(
-						angle(approx[j % 4], approx[j - 2], approx[j - 1]));
-				maxCosine = MAX(maxCosine, cosine);
-			}
-
-			if (maxCosine < 0.5) {
-
-				//stable_sort(approx.begin(), approx.end(), yComparator);
-				if (approx[0].x > approx[1].x) {
-					Point tmp = approx[0];
-					approx[0] = approx[1];
-					approx[1] = tmp;
-				}
-				if (approx[2].x < approx[3].x) {
-					Point tmp = approx[2];
-					approx[2] = approx[3];
-					approx[3] = tmp;
-				}
-
-				// controllo che i lati opposti del quadrato siano pressapoco lunghi uguali
-				// in particolare controllo che tra lati opposti
-				// (lato1 e 3, lato2 e 4) il rapporto tra il minimo e il massimo
-				// sia superiore ad 1/3
-				double edgeLength[4] = { 0.0, 0.0, 0.0, 0.0 };
-				edgeLength[0] = getDistance(approx[0], approx[1]);
-				edgeLength[1] = getDistance(approx[1], approx[2]);
-				edgeLength[2] = getDistance(approx[2], approx[3]);
-				edgeLength[3] = getDistance(approx[3], approx[0]);
-
-				bool a, b, c = false;
-
-				if (edgeLength[0] > edgeLength[2]) {
-					a = edgeLength[2] / edgeLength[0] > ERROR_LEN;
-				} else {
-					a = edgeLength[0] / edgeLength[2] > ERROR_LEN;
-				}
-
-				if (edgeLength[1] > edgeLength[3]) {
-					b = edgeLength[3] / edgeLength[1] > ERROR_LEN;
-				} else {
-					b = edgeLength[1] / edgeLength[3] > ERROR_LEN;
-				}
-
-				// controllo che la differenza tra lato 1 e 2 sia
-				// inferiore a 1/3 il massimo tra i due
-				c = fabs(edgeLength[0] - edgeLength[1])
-						< (MAX(edgeLength[0], edgeLength[1])) * ERROR_LEN;
-
-				if (a && b && c) {
-					// controlla che nn sia un duplicato di qualche altro square
-					if (!isDuplicatedSquare(approx, squares)) {
-						squares.push_back(approx);
-					}
-				}
-			}
+		for(int y = 0;y<contours[i].size();y++){
+			contours[i][y].x = contours[i][y].x/CONST_RESIZE;
+			contours[i][y].y = contours[i][y].y/CONST_RESIZE;
 		}
-	}
-	//imshow("Immaginisenzarumore",timg);
+  		drawContours( mimage, contours, i, Scalar(0,0,255), 2, 8, hierarchy, 0, Point() );
+  		approxPolyDP(Mat(contours[i]), approx,
+  				arcLength(Mat(contours[i]), true) * 0.02, true);
+
+  		if (approx.size() == 4 /*&& contourArea(Mat(approx))*1000 > minArea*/
+  				&& contourArea(Mat(approx)) < maxArea
+  				/*&& isContourConvex(Mat(approx))*/){
+  			double maxCosine = 0;
+  
+  			/*Rect ROI;
+  			ROI = cv::boundingRect(cv::Mat(approx));
+  			Point centerROI(ROI.x + ROI.width / 2, ROI.y + ROI.height / 2);
+  
+  			rectangle( mimage, ROI.tl(), ROI.br(), Scalar(255,255,255), 2, 8);*/
+  
+  
+  			for (int j = 2; j < 5; j++) {
+  				// find the maximum cosine of the angle between joint edges
+  				double cosine = fabs(
+  						angle(approx[j % 4], approx[j - 2], approx[j - 1]));
+  				maxCosine = MAX(maxCosine, cosine);
+  			}
+  
+  			if (maxCosine < 0.5) {
+  
+  				std::stable_sort(approx.begin(), approx.end(), YComparator);
+  				if (approx[0].x > approx[1].x) {
+  					Point tmp = approx[0];
+  					approx[0] = approx[1];
+  					approx[1] = tmp;
+  				}
+  				if (approx[2].x < approx[3].x) {
+  					Point tmp = approx[2];
+  					approx[2] = approx[3];
+  					approx[3] = tmp;
+  				}
+  
+  				// controllo che i lati opposti del quadrato siano pressapoco lunghi uguali
+  				// in particolare controllo che tra lati opposti
+  				// (lato1 e 3, lato2 e 4) il rapporto tra il minimo e il massimo
+  				// sia superiore ad 1/3
+  				double edgeLength[4] = { 0.0, 0.0, 0.0, 0.0 };
+  				edgeLength[0] = getDistance(approx[0], approx[1]);
+  				edgeLength[1] = getDistance(approx[1], approx[2]);
+  				edgeLength[2] = getDistance(approx[2], approx[3]);
+  				edgeLength[3] = getDistance(approx[3], approx[0]);
+  
+  				bool a, b, c = false;
+  
+  				if (edgeLength[0] > edgeLength[2]) {
+  					a = edgeLength[2] / edgeLength[0] > ERROR_LEN;
+  				} else {
+  					a = edgeLength[0] / edgeLength[2] > ERROR_LEN;
+  				}
+  
+  				if (edgeLength[1] > edgeLength[3]) {
+  					b = edgeLength[3] / edgeLength[1] > ERROR_LEN;
+  				} else {
+  					b = edgeLength[1] / edgeLength[3] > ERROR_LEN;
+  				}
+  
+  				// controllo che la differenza tra lato 1 e 2 sia
+  				// inferiore a 1/3 il massimo tra i due
+  				c = fabs(edgeLength[0] - edgeLength[1])
+  						< (MAX(edgeLength[0], edgeLength[1])) * ERROR_LEN;
+  
+  				if (a && b && c) {
+  					// controlla che nn sia un duplicato di qualche altro square
+  					if (!isDuplicatedSquare(approx, squares)) {
+  						squares.push_back(approx);
+  					}
+  				}
+  			}
+  		}
+  	}
+	//imshow("Immaginisenzarumore",mimage);
 }
 
 // the function draws all the squares in the image
@@ -358,9 +356,8 @@ void RCartel::drawSquares(Mat& image, const vector<vector<Point> >& squares) {
 	//***********
 	//imshow("ciao", image);
 }
-bool RCartel::yComparator(const Point& a, const Point& b) {
-	return a.y < b.y;
-}
+
+//controlla se un quadrato è duplicato
 bool RCartel::isDuplicatedSquare(const vector<Point>& toCheck,
 		const vector<vector<Point> >& squares) {
 	for (size_t i = 0; i < squares.size(); i++) {
@@ -396,12 +393,10 @@ int RCartel::findGeometricSignal(Mat& img, Rect& ROI, vector<RCartel::GeomSignal
 	for(int i = 0;i<cartels.size();i++){
 		cvtColor(cartels[i], cartels[i], CV_BGR2GRAY);
 		double diff = diffXorMat(cartels[i],img);
-		cout << diff << endl;
 		if(max(diff,maxVal) == diff && diff > MINPRECISION){
 			maxVal = diff; indexMax=i;
 		}
 	}
-	cout << indexMax << endl;
 	string name = "cart"+to_string(indexMax);
 	geomeSignals.push_back(new GeomSignal(name, img, ROI));
 	return indexMax;
